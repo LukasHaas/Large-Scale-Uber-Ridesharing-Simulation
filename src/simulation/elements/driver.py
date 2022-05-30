@@ -6,10 +6,11 @@ from simpy.core import Environment
 from simpy.resources.store import FilterStore
 from src.utils import cdate
 from src.simulation.params import INITIAL_TIME
+from src.utils.sampling import sample_point_in_geometry
 
 class Driver(object):
-    def __init__(self, num: int, trip_endpoint_data: pd.DataFrame, env: Environment, driver_store: FilterStore,
-                 driver_collection: List, verbose: bool=True):
+    def __init__(self, num: int, trip_endpoint_data: pd.DataFrame, geo_df: pd.DataFrame, env: Environment,
+                 driver_store: FilterStore, driver_collection: List, verbose: bool=True):
         """Instantiates a driver element for the simulation.
 
         Args:
@@ -30,7 +31,7 @@ class Driver(object):
         weekday = int((env.now / 60 / 24) % 7)
         
         # Sample starting position
-        probs = trip_endpoint_data.loc[(weekday, hour_of_day)]['dropoffs'] / trip_endpoint_data.loc[(weekday, hour_of_day)]['dropoffs'].sum()
+        probs = trip_endpoint_data.loc[(weekday, hour_of_day)]['dropoffs']
         self.start_pos = np.random.choice(trip_endpoint_data.loc[(weekday, hour_of_day)]['MOVEMENT_ID_uber'], size=1, p=probs)[0]
         self.curr_pos = self.start_pos
         
@@ -46,6 +47,11 @@ class Driver(object):
         
         # Trips
         self.num_trips = 0
+
+        # Last known location
+        self.last_coming_from = sample_point_in_geometry(geo_df.loc[self.start_pos]['geometry'], 1)
+        self.last_heading_to = self.last_coming_from # sample_point_in_geometry(geo_df.loc[self.start_pos]['geometry'], 1)
+        self.is_oos = True
         
         # Next Location (set by Trip)
         self.rider_loc = None
@@ -82,6 +88,9 @@ class Driver(object):
         
         while True:
             
+            # Signal not on trip with rider right now
+            self.is_oos = True
+            
             # Signal availability
             self.driver_store.put((self.env.now, self))
             if self.num_trips > 0 and self.verbose:
@@ -105,6 +114,7 @@ class Driver(object):
             yield self.env.process(self.oos_drive_to_rider())
             
             # Complete trip
+            self.is_oos = False
             yield self.env.process(self.complete_trip())
 
 
@@ -143,7 +153,8 @@ class Driver(object):
         """
         Out-of-service drive to pickup rider
         """
-        loc, dur = self.rider_loc
+        self.last_coming_from = self.last_heading_to
+        loc, self.last_heading_to, dur = self.rider_loc
         yield self.env.timeout(dur)
         self.curr_pos = loc
         self.oos_drive += dur
@@ -155,7 +166,8 @@ class Driver(object):
         """
         Drive with passenger to location
         """
-        loc, dur = self.dest_loc
+        self.last_coming_from = self.last_heading_to
+        loc, self.last_heading_to, dur = self.dest_loc
         yield self.env.timeout(dur)
         self.curr_pos = loc
         self.trip_total += dur

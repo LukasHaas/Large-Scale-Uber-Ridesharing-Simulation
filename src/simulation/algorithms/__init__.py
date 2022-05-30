@@ -1,2 +1,3 @@
 from .greedy_matcher import GreedyMatcher
 from .rideshare_algorithm import RideShareMatchingAlgorithm
+from .shortest_distance import ShortestDistance

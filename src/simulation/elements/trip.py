@@ -39,8 +39,8 @@ class Trip(object):
         Performs the trip by giving necessary information to both parties.
         """
         # Communicate information
-        rider_loc = (self.rider.pos, self.time_to_rider)
-        trip_loc = (self.rider.des, self.time_to_destination)
+        rider_loc = (self.rider.pos, self.rider.pos_point, self.time_to_rider)
+        trip_loc = (self.rider.des, self.rider.des_point, self.time_to_destination)
         self.driver.set_next_destination(rider_loc, trip_loc)
         self.rider.set_next_trip_duration(self.time_to_rider, self.time_to_destination)
         

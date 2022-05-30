@@ -1,4 +1,6 @@
 *.ipynb_checkpoints/*
 data/*
+runs/*
+server/*
 *.pyc
 *.DS_Store

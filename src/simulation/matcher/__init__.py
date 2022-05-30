@@ -1,1 +1,2 @@
 from .incremental_matcher import IncrementalMatcher
+from .batch_matcher import BatchMatcher

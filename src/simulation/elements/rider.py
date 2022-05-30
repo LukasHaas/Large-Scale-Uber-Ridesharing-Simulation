@@ -74,12 +74,12 @@ class Rider(object):
         # TODO: Given location, sample from TAZ s.t. average uber drive is 5.2 (or whatever) miles llong
         
         # Sample position
-        probs = self.trip_endpoint_data.loc[(weekday, hour_of_day)]['pickups'] / self.trip_endpoint_data.loc[(weekday, hour_of_day)]['pickups'].sum()
+        probs = self.trip_endpoint_data.loc[(weekday, hour_of_day)]['pickups']
         self.pos = np.random.choice(self.trip_endpoint_data.loc[(weekday, hour_of_day)]['MOVEMENT_ID_uber'], size=1, p=probs)[0]
         self.pos_point = sample_point_in_geometry(self.geo_df.loc[self.pos]['geometry'], 1)
         
         # Sample destination - if < 1 minute, rather walk
-        probs = self.trip_endpoint_data.loc[(weekday, hour_of_day)]['dropoffs'] / self.trip_endpoint_data.loc[(weekday, hour_of_day)]['dropoffs'].sum()
+        probs = self.trip_endpoint_data.loc[(weekday, hour_of_day)]['dropoffs']
         while self.des is None or sample_random_trip_time(hour_of_day, self.pos, self.des) < 1.:
             self.des = np.random.choice(self.trip_endpoint_data.loc[(weekday, hour_of_day)]['MOVEMENT_ID_uber'], size=1, p=probs)[0]
             self.des_point = sample_point_in_geometry(self.geo_df.loc[self.des]['geometry'], 1)

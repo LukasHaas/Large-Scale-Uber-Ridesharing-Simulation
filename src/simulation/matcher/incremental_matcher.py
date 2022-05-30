@@ -2,8 +2,8 @@ from .matcher import Matcher
 from typing import List
 from simpy.core import Environment
 from simpy.resources.store import FilterStore
-from src.simulation.algorithms import RideShareMatchingAlgorithm
-from src.simulation.elements import Driver, Trip
+from ..algorithms import RideShareMatchingAlgorithm
+from ..elements import Driver, Trip
 
 class IncrementalMatcher(Matcher):
     def __init__(self, env: Environment, algorithm: RideShareMatchingAlgorithm, store: FilterStore,

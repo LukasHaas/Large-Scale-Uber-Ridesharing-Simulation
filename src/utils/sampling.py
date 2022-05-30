@@ -3,7 +3,10 @@ import numpy as np
 import pandas as pd
 from typing import List
 from shapely.geometry import Polygon, Point
-from src.simulation.params import MIN_TRIP_TIME
+from src.simulation.params import MIN_TRIP_TIME, TRAVEL_TIMES_PATH, PROXY_TIMES_PATH
+
+travel_time_df = pd.read_csv(TRAVEL_TIMES_PATH, index_col=['hod', 'sourceid', 'dstid'])
+proxy_time_df = pd.read_csv(PROXY_TIMES_PATH, index_col=['hod', 'sourceid'])
 
 def sample_point_in_geometry(geometry: Polygon, num_samples: int) -> List[Polygon]:
     """Samples points in the given geometry
@@ -27,8 +30,7 @@ def sample_point_in_geometry(geometry: Polygon, num_samples: int) -> List[Polygo
     
     return points[0] if num_samples == 1 else points
 
-def sample_random_trip_time(hour_of_day: int, origin: int, destination: int, uber_data: pd.DataFrame,
-                            proxy_length: pd.DataFrame, is_trip=False):
+def sample_random_trip_time(hour_of_day: int, origin: int, destination: int, is_trip=False):
     """
     Samples time needed from origin to destination by drawing from log-normal
     distribution based on the geometric mean and geometric standard deviation
@@ -37,10 +39,10 @@ def sample_random_trip_time(hour_of_day: int, origin: int, destination: int, ube
     Minimum time for trips is MIN_TRIP_TIME.
     """
     try:
-        TAZ_times = uber_data.loc[(hour_of_day, origin, destination)]
+        TAZ_times = travel_time_df.loc[(hour_of_day, origin, destination)]
         
     except KeyError:
-        TAZ_times = proxy_length.loc[(hour_of_day, origin)]
+        TAZ_times = proxy_time_df.loc[(hour_of_day, origin)]
         
     geo_mean = TAZ_times['geometric_mean_travel_time']
     geo_std = TAZ_times['geometric_standard_deviation_travel_time']
