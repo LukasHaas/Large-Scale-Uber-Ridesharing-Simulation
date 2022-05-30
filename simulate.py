@@ -7,7 +7,7 @@ from src.simulation.arrivals import RiderProcess, DriverProcess
 from src.simulation.matcher.batch_matcher import BatchMatcher
 from src.simulation.monitoring import save_run, DriverAnalytics
 from src.simulation.params import RUN_DELTA, INITIAL_TIME, INITIAL_DRIVERS, VERBOSE, \
-                                  DEBUG, ARRIVAL_PATH, TRAVEL_TIMES_PATH, PROXY_TIMES_PATH, \
+                                  DEBUG, ARRIVAL_PATH, TRAVEL_TIMES_PATH, \
                                   TAZ_GEOMETRY_PATH, BATCH_FREQUENCY
 
 if __name__ == "__main__":
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     # Load relevant data
     arrival_df = pd.read_csv(ARRIVAL_PATH, index_col=['day_of_week', 'hour'])['pickups']
     travel_time_df = pd.read_csv(TRAVEL_TIMES_PATH, index_col=['hod', 'sourceid', 'dstid'])
-    proxy_time_df = pd.read_csv(PROXY_TIMES_PATH, index_col=['hod', 'sourceid'])
+    # proxy_time_df = pd.read_csv(PROXY_TIMES_PATH, index_col=['hod', 'sourceid'])
     geo_df = pd.read_csv(TAZ_GEOMETRY_PATH, index_col=['MOVEMENT_ID_uber'])
     geo_df['geometry'] = gpd.GeoSeries.from_wkt(geo_df['geometry'])
 
@@ -30,12 +30,11 @@ if __name__ == "__main__":
     store = simpy.FilterStore(env, capacity=simpy.core.Infinity)
     
     # instantiate matching algorithm
-
     if BATCH_FREQUENCY is None:
-        algorithm = GreedyMatcher(uber_data=travel_time_df, proxy_length=proxy_time_df, distance_based=False)
+        algorithm = GreedyMatcher(uber_data=travel_time_df, distance_based=False)
         matcher = IncrementalMatcher(env, algorithm, store, trip_collection, VERBOSE)
     else:
-        algorithm = ShortestDistance(uber_data=travel_time_df, proxy_length=proxy_time_df)
+        algorithm = ShortestDistance(uber_data=travel_time_df)
         matcher = BatchMatcher(env, algorithm, BATCH_FREQUENCY, store, trip_collection, VERBOSE)
         env.process(matcher.keep_running_availabilities())
 
@@ -57,4 +56,4 @@ if __name__ == "__main__":
     env.run(until=INITIAL_TIME + RUN_DELTA)
 
     # Save simulation data
-    save_run(request_collection, da)
+    save_run(request_collection, da, geo_df)

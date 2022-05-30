@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 from typing import List, Tuple
-from itertools import product
 from src.utils.timing import timing
 from .rideshare_algorithm import RideShareMatchingAlgorithm
 from .linear_solver import LinearSolver
@@ -31,23 +30,25 @@ class ShortestDistance(RideShareMatchingAlgorithm):
         
         # Determine hour of day and weekday
         hour = time / 60
-        hour_of_day = [int(hour % 24)]
+        hour_of_day = int(hour % 24)
         
-        # Get driver and rider positions
-        driver_pos = [x.curr_pos for x in drivers]
-        request_pos = [x.pos for x in requests]
-
         # Find best matches
-        multi_index = list(product(hour_of_day, driver_pos, request_pos))
-        travel_times = self.uber_data.loc[multi_index, 'mean_travel_time'].values / 60
-        travel_times = travel_times.reshape((len(drivers), len(requests)))
+        travel_times = []
+        for driver in drivers:
+            for request in requests:
+                cost = self.uber_data.loc[(hour_of_day, driver.curr_pos, request.pos)]['mean_travel_time'] / 60
+                travel_times.append(cost)
+        
+        travel_times = np.array(travel_times).reshape((len(drivers), len(requests)))
         assignments = self.solver.solve_matching(travel_times, minimize=True)
 
-        # Update lists
         matches = []
         for i, driver in enumerate(drivers):
             for j, request in enumerate(requests):
                 if assignments[i, j] == 1:
                     matches.append((request, driver))
+
+        new_drivers = [x for i, x in enumerate(drivers) if assignments.sum(axis=1)[i] == 0]
+        new_requests = [x for i, x in enumerate(requests) if assignments.sum(axis=0)[i] == 0]
         
-        return matches
+        return matches, new_requests, new_drivers

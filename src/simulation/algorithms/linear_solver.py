@@ -1,7 +1,9 @@
 import cvxpy as cp
 import numpy as np
+from src.utils.timing import timing
 
 class LinearSolver(object):
+    @timing
     def solve_matching(self, matrix: np.ndarray, minimize: bool=True) -> np.ndarray:
         """_summary_
 

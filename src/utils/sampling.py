@@ -3,10 +3,9 @@ import numpy as np
 import pandas as pd
 from typing import List
 from shapely.geometry import Polygon, Point
-from src.simulation.params import MIN_TRIP_TIME, TRAVEL_TIMES_PATH, PROXY_TIMES_PATH
+from src.simulation.params import MIN_TRIP_TIME, TRAVEL_TIMES_PATH
 
 travel_time_df = pd.read_csv(TRAVEL_TIMES_PATH, index_col=['hod', 'sourceid', 'dstid'])
-proxy_time_df = pd.read_csv(PROXY_TIMES_PATH, index_col=['hod', 'sourceid'])
 
 def sample_point_in_geometry(geometry: Polygon, num_samples: int) -> List[Polygon]:
     """Samples points in the given geometry
@@ -38,12 +37,7 @@ def sample_random_trip_time(hour_of_day: int, origin: int, destination: int, is_
 
     Minimum time for trips is MIN_TRIP_TIME.
     """
-    try:
-        TAZ_times = travel_time_df.loc[(hour_of_day, origin, destination)]
-        
-    except KeyError:
-        TAZ_times = proxy_time_df.loc[(hour_of_day, origin)]
-        
+    TAZ_times = travel_time_df.loc[(hour_of_day, origin, destination)]   
     geo_mean = TAZ_times['geometric_mean_travel_time']
     geo_std = TAZ_times['geometric_standard_deviation_travel_time']
     time = np.random.lognormal(np.log(geo_mean), np.log(geo_std)) / 60

@@ -41,13 +41,15 @@ class BatchMatcher(Matcher):
             self.available_requests = [x for x in self.available_requests if x.available]
 
             # Get items and compute matches
-            matches, self.available_requests, self.available_drivers = \
-                self.algorithm.create_matches(self.env.now, self.available_requests, self.available_drivers)
+            matches = self.algorithm.create_matches(self.env.now, self.available_requests, self.available_drivers)
 
             # Create trips with matches
             for match in matches:
-                trip = Trip(self.env, match[0], match[1], self.trip_collection, self.verbose)
-                trip.perform()
+                try:
+                    trip = Trip(self.env, match[0], match[1], self.trip_collection, self.verbose)
+                    trip.perform()
+                except IndexError:
+                    print('*' * 30, 'ERROR WITH MATCHING:', match)
             
 
     def keep_running_availabilities(self):
