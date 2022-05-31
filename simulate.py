@@ -1,6 +1,7 @@
 import pandas as pd
 import geopandas as gpd
 import simpy
+from src.utils import Clock
 from src.simulation.algorithms import GreedyMatcher, ShortestDistance
 from src.simulation.matcher import IncrementalMatcher, BatchMatcher
 from src.simulation.arrivals import RiderProcess, DriverProcess
@@ -8,7 +9,7 @@ from src.simulation.matcher.batch_matcher import BatchMatcher
 from src.simulation.monitoring import save_run, DriverAnalytics
 from src.simulation.params import RUN_DELTA, INITIAL_TIME, INITIAL_DRIVERS, VERBOSE, \
                                   DEBUG, ARRIVAL_PATH, TRAVEL_TIMES_PATH, \
-                                  TAZ_GEOMETRY_PATH, BATCH_FREQUENCY
+                                  TAZ_GEOMETRY_PATH, BATCH_FREQUENCY, CLOCK_LOG_TIME
 
 if __name__ == "__main__":
     # Analysis Containers
@@ -50,6 +51,10 @@ if __name__ == "__main__":
     # driver analytics
     da = DriverAnalytics(env, driver_collection)
     env.process(da.analyse())
+
+    # clock
+    clock = Clock(env, CLOCK_LOG_TIME)
+    env.process(clock.run())
 
     # Run simulation
     env.run(until=INITIAL_TIME + RUN_DELTA)

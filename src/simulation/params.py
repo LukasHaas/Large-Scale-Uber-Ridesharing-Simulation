@@ -13,6 +13,7 @@ BATCH_FREQUENCY = 1. / 3
 FUNCTION_TIMING = False
 VERBOSE = True #True
 DEBUG = False # True
+CLOCK_LOG_TIME = 60
 
 # Files
 ARRIVAL_PATH = '/Users/lukashaas/Documents/Stanford/4 Senior/3 Spring/MS&E 230/Project/Code/data/processed_rider_arrival_rates.csv'
