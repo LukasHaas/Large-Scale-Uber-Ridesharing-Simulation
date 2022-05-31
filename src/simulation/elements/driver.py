@@ -101,8 +101,6 @@ class Driver(object):
             
             # Signal availability
             self.driver_store.put((self.env.now, self))
-            #if self.num_trips > 0 and self.verbose:
-            #    print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} ready again @ TAZ {self.curr_pos}')
             
             # Wait for request
             try:

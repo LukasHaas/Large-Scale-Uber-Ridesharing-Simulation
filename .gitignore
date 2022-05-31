@@ -4,3 +4,4 @@ runs/*
 server/*
 *.pyc
 *.DS_Store
+.VSCodeCounter/*

@@ -7,7 +7,7 @@ from src.simulation.params import *
 from src.utils.formatting import cdate
 from .driver_analytics import DriverAnalytics
 
-KEPLER_STR = '%d%m%y %H:%M:%S'
+KEPLER_STR = '%Y/%m/%d %H:%M:%S'
 
 def __create_new_run() -> str:
     folder_name = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
@@ -28,8 +28,6 @@ def extract_ride_information(ride_collection: List) -> pd.DataFrame:
     rides = []
     for ride in ride_collection:
         datetime = cdate(ride.start_wait_time, format_str=KEPLER_STR)
-        date = datetime.split()[0]
-        time = datetime.split()[1]
         taz = ride.pos
         point = ride.pos_point if ride.cancelled else ride.des_point
         point_long = point.coords.xy[0][0]
@@ -40,35 +38,81 @@ def extract_ride_information(ride_collection: List) -> pd.DataFrame:
         driver_wait_time = ride.driver_wait_time
         ride_time = ride.ride_time
         completed = ride.completed
-        rides.append([date, time, taz, point, point_long, point_lat, icon, cancelled, match_wait_time, driver_wait_time, ride_time, completed])
+        rides.append([datetime, taz, point, point_long, point_lat, icon, cancelled, match_wait_time, driver_wait_time, ride_time, completed])
     
-    col_info = ['date', 'time', 'taz', 'geometry', 'long', 'lat', 'icon', 'cancelled', 'match_wait_time', 'driver_wait_time', 'ride_time', 'completed']
+    col_info = ['datetime', 'taz', 'geometry', 'long', 'lat', 'icon', 'cancelled', 'match_wait_time', 'driver_wait_time', 'ride_time', 'completed']
     ride_df = pd.DataFrame(rides, columns=col_info)
     ride_df = gpd.GeoDataFrame(ride_df, crs="EPSG:4326", geometry='geometry')
     return ride_df
 
 
 def __get_taz_geometry(row, geo_df):
-    return geo_df.loc[row['taz']].iloc[0]
+    return geo_df.loc[row['taz']]['geometry']
 
 
-def aggregate_TAZ_information(ride_df: pd.DataFrame, geo_df: pd.DataFrame) -> pd.DataFrame:
+def __get_taz_area(row, geo_df):
+    return geo_df.loc[row['taz']]['AREA']
+
+
+def aggregate_rider_TAZ_information(ride_df: pd.DataFrame, geo_df: pd.DataFrame) -> pd.DataFrame:
     """Aggregates the rider information per TAZ.
 
     Args:
         ride_df (pd.DataFrame): the rider analytics data frame.
+        geo_df (pd.DataFrame): the dataframe containing geometries for TAZs
 
     Returns:
         pd.DataFrame: TAZ-aggregated data.
     """
-    agg_df = ride_df.groupby('taz').agg({
-        'cancelled': 'mean',
-        'match_wait_time': 'mean',
-        'driver_wait_time': 'mean',
-        'ride_time': 'mean'
-    }).reset_index()
+    ride_df['date'] = ride_df['datetime'].apply(lambda x: x.split()[0])
+    ride_df['hour'] = ride_df['datetime'].apply(lambda x: x.split()[1].split(':')[0])
+    agg_df = ride_df.groupby(['date', 'hour', 'taz']).agg(
+        num_requests=('ride_time', 'count'),
+        share_cancelled=('cancelled', 'mean'),
+        mean_match_wait=('match_wait_time', 'mean'),
+        mean_driver_wait=('driver_wait_time', 'mean'),
+        time=('datetime', 'first'),
+    ).reset_index()
+
     agg_df['geometry'] = agg_df.apply(lambda x: __get_taz_geometry(x, geo_df), axis=1)
+    agg_df['area'] = agg_df.apply(lambda x: __get_taz_area(x, geo_df), axis=1)
+    agg_df['rider_density'] = agg_df['num_requests'] / agg_df['area']
     return agg_df
+
+
+def aggregate_driver_TAZ_information(driver_df: pd.DataFrame, geo_df: pd.DataFrame) -> pd.DataFrame:
+    """Aggregates the driver information per TAZ.
+
+    Args:
+        driver_df (pd.DataFrame): the driver analytics data frame.
+        geo_df (pd.DataFrame): the dataframe containing geometries for TAZs
+
+    Returns:
+        pd.DataFrame: TAZ-aggregated data.
+    """
+    driver_df['date'] = driver_df['datetime'].apply(lambda x: x.split()[0])
+    driver_df['hour'] = driver_df['datetime'].apply(lambda x: x.split()[1].split(':')[0])
+    agg_df = driver_df.groupby(['date', 'hour', 'taz']).agg(
+        num_drivers=('driver_id', 'count'),
+        share_idle=('idle', 'mean'),
+        share_oos=('is_oos', 'mean'),
+        share_passenger_trip=('passenger_drive', 'mean'),
+        time=('datetime', 'first'),
+    ).reset_index()
+
+    agg_df['geometry'] = agg_df.apply(lambda x: __get_taz_geometry(x, geo_df), axis=1)
+    agg_df['area'] = agg_df.apply(lambda x: __get_taz_area(x, geo_df), axis=1)
+    agg_df['driver_density'] = agg_df['num_drivers'] / agg_df['area']
+    return agg_df
+
+
+def __compute_driver_status(row):
+    if row['ontrip'] == False:
+        return 0
+    if row['is_oos']:
+        return 1
+    else:
+        return 2
 
 
 def extract_driver_information(da: DriverAnalytics) -> pd.DataFrame:
@@ -80,9 +124,14 @@ def extract_driver_information(da: DriverAnalytics) -> pd.DataFrame:
     Returns:
         pd.DataFrame: driver data.
     """
-    col_info = ['date', 'time', 'driver_id', 'from_lon', 'from_lat', 'to_lon', 'to_lat', 'is_oos', 'ontrip']
+    col_info = ['datetime', 'taz', 'driver_id', 'from_lon', 'from_lat', 'to_lon', 'to_lat', 'is_oos', 'ontrip']
     driver_df = pd.DataFrame(da.analytics, columns=col_info)
-    # driver_df = gpd.GeoDataFrame(driver_df, crs="EPSG:4326", geometry='geometry')
+    if driver_df.empty:
+        return None
+
+    driver_df['status'] = driver_df.apply(__compute_driver_status, axis=1)
+    driver_df['idle'] = driver_df['status'].apply(lambda x: x == 0)
+    driver_df['passenger_drive'] = driver_df['status'].apply(lambda x: x == 2)
     return driver_df
 
 
@@ -116,12 +165,16 @@ def save_run(ride_collection: List, da: DriverAnalytics, geo_df: pd.DataFrame):
     ride_info_df = extract_ride_information(ride_collection)
     ride_info_df.to_csv(new_dir + '/ride_info.csv', index=False)
 
-    taz_agg_df = aggregate_TAZ_information(ride_info_df, geo_df)
-    taz_agg_df.to_csv(new_dir + '/taz_info.csv', index=False)
+    rider_taz_agg_df = aggregate_rider_TAZ_information(ride_info_df, geo_df)
+    rider_taz_agg_df.to_csv(new_dir + '/rider_taz_info.csv', index=False)
 
     driver_info_df = extract_driver_information(da)
-    driver_info_df.to_csv(new_dir + '/driver_info.csv', index=False)
-    
+    if driver_info_df is not None:
+        driver_info_df.to_csv(new_dir + '/driver_info.csv', index=False)
+
+        driver_taz_agg_df = aggregate_driver_TAZ_information(driver_info_df, geo_df)
+        driver_taz_agg_df.to_csv(new_dir + '/driver_taz_info.csv', index=False)
+
     save_metadata(new_dir)
 
 if __name__ == '__main__':
