@@ -15,7 +15,7 @@ class ShortestDistance(RideShareMatchingAlgorithm):
         self.solver = LinearSolver()
     
     @timing
-    def create_matches(self, time: float, requests: List, drivers: List) -> Tuple:
+    def create_matches(self, time: float, requests: List, drivers: List) -> List:
         """Generates matches to minimize OOS driving time.
 
         Args:
@@ -24,10 +24,10 @@ class ShortestDistance(RideShareMatchingAlgorithm):
             drivers (List): list of drivers
 
         Returns:
-            Tuple: matches, unmatched requests, and unmatched drivers
+            List: list of tuples of (rider, driver) matches
         """
         if not ShortestDistance.is_match_possible(requests, drivers):
-            return [], requests, drivers
+            return []
         
         # Determine hour of day and weekday
         hour = time / 60

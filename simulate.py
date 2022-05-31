@@ -17,9 +17,8 @@ if __name__ == "__main__":
     trip_collection = []
 
     # Load relevant data
-    arrival_df = pd.read_csv(ARRIVAL_PATH, index_col=['day_of_week', 'hour'])['pickups']
+    arrival_df = pd.read_csv(ARRIVAL_PATH, index_col=['day_of_week', 'hour', 'minute'])['pickups']
     travel_time_df = pd.read_csv(TRAVEL_TIMES_PATH, index_col=['hod', 'sourceid', 'dstid'])
-    # proxy_time_df = pd.read_csv(PROXY_TIMES_PATH, index_col=['hod', 'sourceid'])
     geo_df = pd.read_csv(TAZ_GEOMETRY_PATH, index_col=['MOVEMENT_ID_uber'])
     geo_df['geometry'] = gpd.GeoSeries.from_wkt(geo_df['geometry'])
 

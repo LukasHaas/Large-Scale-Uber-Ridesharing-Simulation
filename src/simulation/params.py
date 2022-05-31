@@ -5,8 +5,8 @@ UBER_MARKET_SHARE = 0.8
 MIN_TRIP_TIME = 1.
 START_DATE = datetime(year=2016, month=12, day=5)
 INITIAL_DRIVERS = 2500 # 200
-INITIAL_TIME = 2 * 24 * 60 + 12 * 60  # Wednesday @ noon
-RUN_DELTA = 60 * 24
+INITIAL_TIME = 0 * 24 * 60 + 12 * 60  # Monday @ noon
+RUN_DELTA = 60 * 24 * 7 # Full week
 BATCH_FREQUENCY = 1. / 3
 
 # Output control

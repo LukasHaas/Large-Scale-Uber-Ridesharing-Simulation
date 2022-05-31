@@ -1,9 +1,10 @@
+from urllib.request import Request
 from .matcher import Matcher
 from typing import List
 from simpy.core import Environment
 from simpy.resources.store import FilterStore
 from ..algorithms import RideShareMatchingAlgorithm
-from ..elements import Driver, Trip
+from ..elements import Driver, Trip, Rider
 
 class BatchMatcher(Matcher):
     def __init__(self, env: Environment, algorithm: RideShareMatchingAlgorithm, frequency: float,
@@ -45,6 +46,9 @@ class BatchMatcher(Matcher):
 
             # Create trips with matches
             for match in matches:
+                if isinstance(match, tuple) == False:
+                    continue
+
                 try:
                     trip = Trip(self.env, match[0], match[1], self.trip_collection, self.verbose)
                     trip.perform()
@@ -60,5 +64,7 @@ class BatchMatcher(Matcher):
             _, new_item = yield self.store.get(lambda x: x[1].available)
             if isinstance(new_item, Driver):
                 self.available_drivers.append(new_item)
-            else:
+            elif isinstance(new_item, Rider):
                 self.available_requests.append(new_item)
+            else:
+                raise Exception('Invalid object entered FilterStore:', new_item)

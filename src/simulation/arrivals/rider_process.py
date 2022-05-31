@@ -23,13 +23,14 @@ class RiderProcess(ArrivalProcess):
         rider_number = 0
         while True:
             
-            # Determine hour of day and weekday        
+            # Determine minute, hour of day and weekday
+            minute = int(self.env.now % 60)   
             hour = self.env.now / 60
             hour_of_day = int(hour % 24)
             weekday = int((self.env.now / 60 / 24) % 7)
             
             # Simulate Poission arrival
-            rate = self.arrival_df.loc[(weekday, hour_of_day)] / 60
+            rate = self.arrival_df.loc[(weekday, hour_of_day, minute)] / 60
             if self.debug:
                 rate /= 10 # Slow down
                 

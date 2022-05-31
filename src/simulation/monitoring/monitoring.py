@@ -34,18 +34,15 @@ def extract_ride_information(ride_collection: List) -> pd.DataFrame:
         point = ride.pos_point if ride.cancelled else ride.des_point
         point_long = point.coords.xy[0][0]
         point_lat = point.coords.xy[1][0]
-        #start_long = ride.pos_point.coords.xy[0][0]
-        #start_lat = ride.pos_point.coords.xy[1][0]
-        #end_long = ride.des_point.coords.xy[0][0]
-        #end_lat = ride.des_point.coords.xy[1][0]
         icon = 'cancel' if ride.cancelled else 'check'
-        cancelled = int(ride.cancelled)
-        wait_time = ride.wait_time
+        cancelled = ride.cancelled
+        match_wait_time = ride.wait_time
+        driver_wait_time = ride.driver_wait_time
         ride_time = ride.ride_time
         completed = ride.completed
-        rides.append([date, time, taz, point, point_long, point_lat, icon, cancelled, wait_time, ride_time, completed])
+        rides.append([date, time, taz, point, point_long, point_lat, icon, cancelled, match_wait_time, driver_wait_time, ride_time, completed])
     
-    col_info = ['date', 'time', 'taz', 'geometry', 'long', 'lat', 'icon', 'cancelled', 'wait_time', 'ride_time', 'completed']
+    col_info = ['date', 'time', 'taz', 'geometry', 'long', 'lat', 'icon', 'cancelled', 'match_wait_time', 'driver_wait_time', 'ride_time', 'completed']
     ride_df = pd.DataFrame(rides, columns=col_info)
     ride_df = gpd.GeoDataFrame(ride_df, crs="EPSG:4326", geometry='geometry')
     return ride_df
