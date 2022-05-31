@@ -5,7 +5,7 @@ from src.utils.timing import timing
 class LinearSolver(object):
     @timing
     def solve_matching(self, matrix: np.ndarray, minimize: bool=True) -> np.ndarray:
-        """_summary_
+        """Solves a linear program to minimize travel times in driver-rider assignments.
 
         Args:
             matrix (np.ndarray): _description_
