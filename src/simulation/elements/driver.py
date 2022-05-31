@@ -9,20 +9,26 @@ from src.simulation.params import INITIAL_TIME
 from src.utils.sampling import sample_point_in_geometry
 
 class Driver(object):
-    def __init__(self, num: int, trip_endpoint_data: pd.DataFrame, geo_df: pd.DataFrame, env: Environment,
-                 driver_store: FilterStore, driver_collection: List, verbose: bool=True):
+    def __init__(self, num: int, trip_endpoint_data: pd.DataFrame, geo_df: pd.DataFrame, num_driver_df: pd.DataFrame, env: Environment,
+                 driver_store: FilterStore, driver_collection: List, num_active_drivers: List, verbose: bool=True):
         """Instantiates a driver element for the simulation.
 
         Args:
             num (int): unique driver number
+            trip_endpoint_data (pd.DataFrame): dataframe to sample start location from
+            geo_df (pd.DataFrame): dataframe with geographic geometries to sample point within TAZ for visualization
+            num_driver_df (pd.DataFrame): dataframe containing supply side data for uber drivers
             env (Environment): simpy environment
             driver_store (FilterStore): container of all available drivers
             driver_collection (List): list of all drivers
+            num_active_drivers (List): list containing one number which is the current number of active drivers
             verbose (bool, optional): verbose setting. Defaults to True.
         """
         self.num = num
         self.env = env
         self.driver_store = driver_store
+        self.num_driver_df = num_driver_df
+        self.num_active_drivers = num_active_drivers
         self.verbose = verbose
         
         # Determine hour of day and weekday
@@ -83,8 +89,10 @@ class Driver(object):
         """
         Driver starts servicing requests.
         """
+        # Go online on uber app
+        self.go_online()
         if self.env.now > INITIAL_TIME and self.verbose:
-            print(f'{cdate(self.env.now)}: New Driver {self.num:5.0f} @ TAZ {self.start_pos}')
+            print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} dispatched @ TAZ {self.start_pos}. Active drivers: {self.num_active_drivers[0]:,}')
         
         while True:
             
@@ -93,8 +101,8 @@ class Driver(object):
             
             # Signal availability
             self.driver_store.put((self.env.now, self))
-            if self.num_trips > 0 and self.verbose:
-                print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} ready again @ TAZ {self.curr_pos}')
+            #if self.num_trips > 0 and self.verbose:
+            #    print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} ready again @ TAZ {self.curr_pos}')
             
             # Wait for request
             try:
@@ -117,6 +125,43 @@ class Driver(object):
             self.is_oos = False
             yield self.env.process(self.complete_trip())
 
+            # Decide if should head home
+            if self.should_head_home():
+                self.go_offline()
+                if self.verbose:
+                    print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} is heading home. Going offline. Active drivers: {self.num_active_drivers[0]:,}')
+
+                return
+
+
+    def go_offline(self):
+        """Sets driver to offline.
+        """
+        self.num_active_drivers[0] -= 1
+        self.__available = False
+
+    
+    def go_online(self):
+        """Sets driver to online.
+        """
+        self.num_active_drivers[0] += 1
+        self.__available = True
+
+    
+    def should_head_home(self):
+        """Process for driver to decide if heading home
+
+        Note: the process depends on how close the current number of online drivers
+              matches the overall average number of online drivers at that time.
+        """
+
+        hour = (self.env.now / 60)
+        hour_of_day = int(hour % 24)
+        minute = int(self.env.now % 60)
+        target_uber_supply = self.num_driver_df.loc[(hour_of_day, minute), 'n_drivers']
+        num_active = self.num_active_drivers[0]
+        return (num_active - target_uber_supply) > 1
+
 
     def wait_for_request(self):
         """
@@ -135,10 +180,10 @@ class Driver(object):
         self.oos_wait += wait_time
 
         # Go offline if wait was too long
-        if wait_time == self.patience:
-            self.__available = False
-            if self.verbose:
-                print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} waited too long -> offline')
+        #if wait_time == self.patience:
+        #    self.__available = False
+        #    if self.verbose:
+        #        print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} waited too long -> offline')
             
             
     def set_next_destination(self, rider_loc, dest_loc):

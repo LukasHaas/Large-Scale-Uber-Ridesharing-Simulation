@@ -1,7 +1,6 @@
 from typing import List
 import random
 import pandas as pd
-import geopandas as gpd
 from simpy.core import Environment
 from simpy.resources.store import FilterStore
 from .arrival_process import ArrivalProcess

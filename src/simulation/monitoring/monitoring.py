@@ -63,7 +63,8 @@ def aggregate_TAZ_information(ride_df: pd.DataFrame, geo_df: pd.DataFrame) -> pd
     """
     agg_df = ride_df.groupby('taz').agg({
         'cancelled': 'mean',
-        'wait_time': 'mean',
+        'match_wait_time': 'mean',
+        'driver_wait_time': 'mean',
         'ride_time': 'mean'
     }).reset_index()
     agg_df['geometry'] = agg_df.apply(lambda x: __get_taz_geometry(x, geo_df), axis=1)
