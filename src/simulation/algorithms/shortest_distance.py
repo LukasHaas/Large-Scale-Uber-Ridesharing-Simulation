@@ -34,13 +34,15 @@ class ShortestDistance(RideShareMatchingAlgorithm):
         hour_of_day = [int(hour % 24)]
         
         # Get driver and rider positions
-        driver_pos = [x.curr_pos for x in drivers]
+        driver_pos = [x.anticipated_pos for x in drivers]
+        driver_exp_times = np.array([x.exp_time_to_availability for x in drivers]).reshape((len(drivers), 1))
         request_pos = [x.pos for x in requests]
 
         # Find best matches
         multi_index = list(product(hour_of_day, driver_pos, request_pos))
         travel_times = self.uber_data.loc[multi_index, 'mean_travel_time'].values / 60
         travel_times = travel_times.reshape((len(drivers), len(requests)))
+        travel_times += driver_exp_times
         assignments = self.solver.solve_matching(travel_times, minimize=True)
 
         # Update lists

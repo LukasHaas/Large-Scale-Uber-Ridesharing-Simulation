@@ -4,16 +4,18 @@ from simpy.core import Environment
 from simpy.resources.store import FilterStore
 from .arrival_process import ArrivalProcess
 from src.simulation.elements import Driver
-from src.simulation.params import PICKUP_DROPOFF_PATH, DRIVER_PATH, UBER_MARKET_SHARE, DEBUG
+from src.simulation.params import PICKUP_DROPOFF_PATH, DRIVER_PATH, UBER_MARKET_SHARE, DEBUG, STALL_DRIVERS
 
 class DriverProcess(ArrivalProcess):
     def __init__(self, env: Environment, store: FilterStore, collection: List, initial_drivers: int, \
-                 num_active_drivers: List, geo_df: pd.DataFrame, verbose: bool = True, debug: bool = False):
+                 num_active_drivers: List, anticipated_active_drivers: List, geo_df: pd.DataFrame, \
+                 verbose: bool = True, debug: bool = False):
         super().__init__(env, store, collection, verbose, debug)
         self.initial_drivers = initial_drivers
         self.geo_df = geo_df
         self.driver_number = 0
         self.__num_active_drivers = num_active_drivers
+        self.anticipated_active_drivers = anticipated_active_drivers
         self.drivers = []
 
         # Load driver supply data
@@ -28,7 +30,10 @@ class DriverProcess(ArrivalProcess):
             self.initial_drivers = int(self.num_driver_df.loc[(hour_of_day, minute), 'n_drivers'])
         
         # Adjust for debug
-        if DEBUG:
+        if self.debug:
+            self.num_driver_df /= 10
+
+        if STALL_DRIVERS:
             self.num_driver_df /= 10
 
         # Load trip endpoint data
@@ -51,7 +56,8 @@ class DriverProcess(ArrivalProcess):
         """
         for _ in range(n):
             Driver(self.driver_number, self.trip_endpoint_data, self.geo_df, self.num_driver_df, self.env,
-                   self.store, self.collection, self.__num_active_drivers, self.verbose)
+                   self.store, self.collection, self.__num_active_drivers, self.anticipated_active_drivers,
+                   self.verbose)
             self.driver_number += 1
 
 
@@ -59,6 +65,7 @@ class DriverProcess(ArrivalProcess):
         """Spawns initial drivers
         """
         n_drivers = self.initial_drivers if self.debug == False else int(self.initial_drivers / 10)
+        n_drivers = n_drivers if STALL_DRIVERS == False else int(n_drivers / 10)
         self.dispatch_drivers(n_drivers)
         if self.verbose:
             print(f'Spawned {n_drivers:,} drivers')

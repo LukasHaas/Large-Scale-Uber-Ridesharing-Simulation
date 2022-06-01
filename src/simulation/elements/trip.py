@@ -1,8 +1,8 @@
 from typing import List
 from simpy.core import Environment
-from src.utils import sample_random_trip_time
 from .driver import Driver
 from .rider import Rider
+from .job import Job
 from src.utils import cdate
 
 class Trip(object):
@@ -15,17 +15,9 @@ class Trip(object):
         self.rider = rider
         self.driver = driver
         self.verbose = verbose
-        
-        # Determine hour of day and weekday
-        self.start_time = env.now
-        self.hour_of_day = int((env.now / 60) % 24)
-        
-        # Calculate time needed for getting to rider
-        self.time_to_rider = sample_random_trip_time(self.hour_of_day, driver.curr_pos, rider.pos)
-        
-        # Calculate time needed for trip (look ahead)
-        hour_of_day_trip = int(((env.now + self.time_to_rider) / 60) % 24)
-        self.time_to_destination = sample_random_trip_time(hour_of_day_trip, rider.pos, rider.des, is_trip=True)
+
+        # Create job
+        self.job = Job(env, rider, driver)
         
         # Save trip for analysis
         trip_collection.append(self)
@@ -39,13 +31,13 @@ class Trip(object):
         Performs the trip by giving necessary information to both parties.
         """
         # Communicate information
-        rider_loc = (self.rider.pos, self.rider.pos_point, self.time_to_rider)
-        trip_loc = (self.rider.des, self.rider.des_point, self.time_to_destination)
-        self.driver.set_next_destination(rider_loc, trip_loc)
-        self.rider.set_next_trip_duration(self.time_to_rider, self.time_to_destination)
+        self.driver.accept_job(self.job)
+        self.rider.set_trip_duration(self.job)
         
-        # Wake up parties
+        # Wake up parties as required
+        self.rider.action.interrupt()
+        if self.driver.num_jobs == 1 and self.driver.curr_job is None:
+            self.driver.action.interrupt()
+
         if self.verbose:
             print(f'{cdate(self.env.now)}: Trip communicated (Driver: {self.driver.num}, Rider: {self.rider.num})')
-        self.driver.action.interrupt()
-        self.rider.action.interrupt()

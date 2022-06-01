@@ -5,6 +5,7 @@ import simpy
 from simpy.core import Environment
 from simpy.resources.store import FilterStore
 from src.utils import sample_point_in_geometry, sample_random_trip_time, cdate
+from .job import Job
 
 class Rider(object):
     def __init__(self, num: int, trip_endpoint_data: pd.DataFrame, geo_df: pd.DataFrame, env: Environment,
@@ -59,6 +60,7 @@ class Rider(object):
     @property
     def total_trip_time(self):
         return self.wait_time + self.driver_wait_time + self.ride_time
+
         
     def initialize_location(self):
         """
@@ -98,7 +100,7 @@ class Rider(object):
         # Wait for pickup
         self.request_store.put((self.env.now, self))
         if self.verbose:
-            print(f'{cdate(self.env.now)}: Rider {self.num:5.0f} requests: TAZ {self.pos} -> TAZ {self.des}')
+            print(f'{cdate(self.env.now)}: Rider {self.num:6.0f} requests: TAZ {self.pos} -> TAZ {self.des}')
         
         try:
             yield self.env.process(self.wait_for_match())
@@ -108,30 +110,31 @@ class Rider(object):
         end_time = self.env.now
         self.wait_time = end_time - self.start_wait_time
         if self.wait_time >= self.match_patience:
-            self.__available = False
             if self.verbose:
-                print(f'{cdate(self.env.now)}: Rider {self.num:5.0f} waited too long for match -> cancelled')
+                print(f'{cdate(self.env.now)}: Rider {self.num:6.0f} waited too long for match -> cancelled')
             return
         
         self.matched_with_driver = True
         
         # Got matched with driver, waiting for driver arrival
         if self.verbose:
-            print(f'{cdate(self.env.now)}: Rider {self.num:5.0f} got matched, waited for {self.wait_time:2.2f} @ TAZ {self.pos}')
+            print(f'{cdate(self.env.now)}: Rider {self.num:6.0f} got matched, waited for {self.wait_time:2.2f} @ TAZ {self.pos}')
         yield self.env.process(self.wait_for_pickup())
         
         # Complete trip
         if self.verbose:
-            print(f'{cdate(self.env.now)}: Rider {self.num:5.0f} starts trip, waited for {self.driver_wait_time:2.2f} @ TAZ {self.pos}')
+            print(f'{cdate(self.env.now)}: Rider {self.num:6.0f} starts trip, waited for {self.driver_wait_time:2.2f} @ TAZ {self.pos}')
         yield self.env.timeout(self.ride_time)
         self.completed = True
         
-    def set_next_trip_duration(self, wait_time, ride_time):
+
+    def set_trip_duration(self, job: Job):
         """
         Set times for waiting for driver and coming trip
         """
-        self.driver_wait_time = wait_time
-        self.ride_time = ride_time
+        self.driver_wait_time = job.to_rider.time
+        self.ride_time = job.to_dest.time
+
         
     def wait_for_match(self):
         """
@@ -142,17 +145,20 @@ class Rider(object):
             yield self.env.timeout(simpy.core.Infinity)
         else:
             yield self.env.timeout(self.match_patience)
+        
+        self.__available = False
+
             
     def wait_for_pickup(self):
         """
         Implements a wait process for driver coming to rider, optionally with a patience.
         """
-        if self.wait_patience is not None and self.driver_wait_time > self.wait_patience:
-            yield self.env.timeout(0.5) # wait 30 seconds and then decide to cancel
-            self.__available = False
-            if self.verbose:
-                print(f'{cdate(self.env.now)}: Rider {self.num:5.0f} thinks wait time is too long -> cancelled')
-            return
-            # TODO: TELL DRIVER TO GET NEW REQUEST
+        #if self.wait_patience is not None and self.driver_wait_time > self.wait_patience:
+        #    yield self.env.timeout(0.5) # wait 30 seconds and then decide to cancel
+        #    self.__available = False
+        #    if self.verbose:
+        #        print(f'{cdate(self.env.now)}: Rider {self.num:5.0f} thinks wait time is too long -> cancelled')
+        #    return
+        #    # TODO: TELL DRIVER TO GET NEW REQUEST
         
         yield self.env.timeout(self.driver_wait_time)

@@ -46,14 +46,8 @@ class BatchMatcher(Matcher):
 
             # Create trips with matches
             for match in matches:
-                if isinstance(match, tuple) == False:
-                    continue
-
-                try:
-                    trip = Trip(self.env, match[0], match[1], self.trip_collection, self.verbose)
-                    trip.perform()
-                except IndexError:
-                    print('*' * 30, 'ERROR WITH MATCHING:', match)
+                trip = Trip(self.env, match[0], match[1], self.trip_collection, self.verbose)
+                trip.perform()
             
 
     def keep_running_availabilities(self):

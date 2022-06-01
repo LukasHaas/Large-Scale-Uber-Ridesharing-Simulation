@@ -5,12 +5,13 @@ import simpy
 from simpy.core import Environment
 from simpy.resources.store import FilterStore
 from src.utils import cdate
-from src.simulation.params import INITIAL_TIME
+from src.simulation.params import INITIAL_TIME, MAX_DRIVER_JOB_QUEUE
 from src.utils.sampling import sample_point_in_geometry
 
 class Driver(object):
     def __init__(self, num: int, trip_endpoint_data: pd.DataFrame, geo_df: pd.DataFrame, num_driver_df: pd.DataFrame, env: Environment,
-                 driver_store: FilterStore, driver_collection: List, num_active_drivers: List, verbose: bool=True):
+                 driver_store: FilterStore, driver_collection: List, num_active_drivers: List, anticipated_active_drivers: List,
+                 verbose: bool=True):
         """Instantiates a driver element for the simulation.
 
         Args:
@@ -22,6 +23,8 @@ class Driver(object):
             driver_store (FilterStore): container of all available drivers
             driver_collection (List): list of all drivers
             num_active_drivers (List): list containing one number which is the current number of active drivers
+            anticipated_active_drivers (List): list containing one number which is the anticipated number of active drivers
+                                               once every driver has emptied their job queue.
             verbose (bool, optional): verbose setting. Defaults to True.
         """
         self.num = num
@@ -29,6 +32,7 @@ class Driver(object):
         self.driver_store = driver_store
         self.num_driver_df = num_driver_df
         self.num_active_drivers = num_active_drivers
+        self.anticipated_active_drivers = anticipated_active_drivers
         self.verbose = verbose
         
         # Determine hour of day and weekday
@@ -45,23 +49,25 @@ class Driver(object):
         self.oos_wait = 0
         self.oos_drive = 0
         self.trip_total = 0
-        self.__available = True
+        self.num_trips = 0
+
+        # Status flags
+        self.online = True
+        self.accepting_jobs = True
         self.ontrip = False
+        self.is_oos = True
+        self.will_head_home = False
         
         # Patience (NONE for infinity)
         self.patience = None
-        
-        # Trips
-        self.num_trips = 0
 
         # Last known location
         self.last_coming_from = sample_point_in_geometry(geo_df.loc[self.start_pos]['geometry'], 1)
-        self.last_heading_to = self.last_coming_from # sample_point_in_geometry(geo_df.loc[self.start_pos]['geometry'], 1)
-        self.is_oos = True
+        self.last_heading_to = self.last_coming_from
         
-        # Next Location (set by Trip)
-        self.rider_loc = None
-        self.dest_loc = None
+        # Job queue
+        self.jobs = []
+        self.curr_job = None
         
         # Save driver for analysis
         driver_collection.append(self)
@@ -71,11 +77,11 @@ class Driver(object):
         
     @property
     def available(self):
-        return self.__available and self.ontrip == False
+        return self.online and self.accepting_jobs and self.will_head_home == False
         
     @property
     def offline(self):
-        return self.__available == False
+        return self.online == False
         
     @property
     def oos_total(self):
@@ -85,65 +91,107 @@ class Driver(object):
     def total_time_active(self):
         return self.oos_wait + self.oos_drive + self.trip_total
 
+    @property
+    def num_jobs(self):
+        n = len(self.jobs)
+        if self.curr_job is not None:
+            n += 1
+
+        return n
+
+    @property
+    def exp_time_to_availability(self):
+        if self.num_jobs == 0:
+            return 0
+
+        time_needed = np.sum([job.expected_time for job in self.jobs])
+        if self.curr_job is not None:
+            time_needed += self.curr_job.exp_time_to_completion
+
+        return time_needed
+
+    @property
+    def anticipated_pos(self):
+        if self.num_jobs == 0:
+            return self.curr_pos
+        elif self.curr_job is not None:
+            return self.curr_job.to_dest.taz
+        else:
+            return self.jobs[-1].to_dest.taz
+
+
     def drive(self):
         """
         Driver starts servicing requests.
         """
-        # Go online on uber app
+        # Go online on app
         self.go_online()
         if self.env.now > INITIAL_TIME and self.verbose:
             print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} dispatched @ TAZ {self.start_pos}. Active drivers: {self.num_active_drivers[0]:,}')
         
-        while True:
+        while self.online:
             
             # Signal not on trip with rider right now
             self.is_oos = True
             
-            # Signal availability
-            self.driver_store.put((self.env.now, self))
+            # Wait for request if job queue is empty
+            if self.num_jobs == 0:
+                try:
+                    yield self.env.process(self.wait_for_request())
+                except simpy.Interrupt:
+                    if self.verbose:
+                        print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} got request, waited for {self.oos_wait:2.2f} @ TAZ {self.curr_pos}')
             
-            # Wait for request
-            try:
-                yield self.env.process(self.wait_for_request())
-            except simpy.Interrupt:
-                pass
-            
-            if self.offline:
-                return
-            
-            # Received request
-            self.ontrip = True
-            if self.verbose:
-                print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} got request, waited for {self.oos_wait:2.2f} @ TAZ {self.curr_pos}')
+            # Get job
+            self.curr_job = self.jobs.pop(0)
             
             # Drive to rider
-            yield self.env.process(self.oos_drive_to_rider())
+            yield self.env.process(self.oos_drive_to_rider(self.curr_job))
             
             # Complete trip
-            self.is_oos = False
-            yield self.env.process(self.complete_trip())
+            yield self.env.process(self.complete_trip(self.curr_job))
 
             # Decide if should head home
-            if self.should_head_home():
+            self.should_head_home()
+                
+            # Update accepting jobs
+            self.update_accepting_jobs_status()
+            
+            # Go offline if necessary
+            if self.num_jobs == 0 and self.will_head_home:
                 self.go_offline()
                 if self.verbose:
                     print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} is heading home. Going offline. Active drivers: {self.num_active_drivers[0]:,}')
 
-                return
+    
+    def update_accepting_jobs_status(self):
+        """Updates whether driver can accept further jobs.
+        """
+        if self.will_head_home:
+            self.accepting_jobs = False
+            return
+        
+        self.accepting_jobs = (self.num_jobs < MAX_DRIVER_JOB_QUEUE)
+        if self.accepting_jobs:
+            self.driver_store.put((self.env.now, self))
 
 
     def go_offline(self):
         """Sets driver to offline.
         """
         self.num_active_drivers[0] -= 1
-        self.__available = False
+        self.online = False
 
     
     def go_online(self):
         """Sets driver to online.
         """
         self.num_active_drivers[0] += 1
-        self.__available = True
+        self.anticipated_active_drivers[0] += 1
+        self.online = True
+        
+        # Signal availability
+        self.driver_store.put((self.env.now, self))
 
     
     def should_head_home(self):
@@ -156,8 +204,10 @@ class Driver(object):
         hour_of_day = int(hour % 24)
         minute = int(self.env.now % 60)
         target_uber_supply = self.num_driver_df.loc[(hour_of_day, minute), 'n_drivers']
-        num_active = self.num_active_drivers[0]
-        return (num_active - target_uber_supply) > 1
+        num_active = self.anticipated_active_drivers[0]
+        self.will_head_home = (num_active > target_uber_supply) and self.num_trips > 0
+        if self.will_head_home:
+            self.anticipated_active_drivers[0] -= 1
 
 
     def wait_for_request(self):
@@ -181,39 +231,58 @@ class Driver(object):
         #    self.__available = False
         #    if self.verbose:
         #        print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} waited too long -> offline')
-            
-            
-    def set_next_destination(self, rider_loc, dest_loc):
+
+
+    def accept_job(self, job):
+        """Utility method for drivers accepting jobs.
+
+        Args:
+            job (Job): driving job to accept.
         """
-        Sets next location to drive to and duration needed.
-        """
-        self.rider_loc = rider_loc
-        self.dest_loc = dest_loc
+        self.jobs.append(job)
+        self.update_accepting_jobs_status()
+        if self.verbose:
+            print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} accepted job # {self.num_jobs}: TAZ {job.to_rider.taz} -> TAZ {job.to_dest.taz}')
 
             
-    def oos_drive_to_rider(self):
+    def oos_drive_to_rider(self, job):
         """
         Out-of-service drive to pickup rider
         """
+        # Update headings
         self.last_coming_from = self.last_heading_to
-        loc, self.last_heading_to, dur = self.rider_loc
-        yield self.env.timeout(dur)
-        self.curr_pos = loc
-        self.oos_drive += dur
+        self.last_heading_to = job.to_rider.point
+
+        # Drive
+        self.ontrip = True
+        job.start()
+        yield self.env.timeout(job.to_rider.time)
+
+        # Update flags and analytics
+        self.curr_pos = job.to_rider.taz
+        self.oos_drive += job.to_rider.time
+        self.is_oos = False
         if self.verbose:
-            print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} OOS-drive: TAZ {self.curr_pos} -> TAZ {loc}')
+            print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} OOS-drive: TAZ {self.curr_pos} -> TAZ {job.to_rider.taz}')
 
     
-    def complete_trip(self):
+    def complete_trip(self, job):
         """
         Drive with passenger to location
         """
+        # Upodate headings
         self.last_coming_from = self.last_heading_to
-        loc, self.last_heading_to, dur = self.dest_loc
-        yield self.env.timeout(dur)
-        self.curr_pos = loc
-        self.trip_total += dur
+        self.last_heading_to = job.to_dest.point
+
+        # Drive
+        yield self.env.timeout(job.to_dest.time)
+
+        # Update flags and analytics
+        self.curr_job = None
+        self.curr_pos = job.to_dest.taz
         self.ontrip = False
+        self.trip_total += job.to_dest.time
         self.num_trips += 1
+
         if self.verbose:
-            print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} completed trip @ TAZ {loc}')
+            print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} completed trip @ TAZ {job.to_dest.taz}')

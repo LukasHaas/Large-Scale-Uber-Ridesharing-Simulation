@@ -80,10 +80,10 @@ def __match_with_geo_df(df: pd.DataFrame, geo_df: pd.DataFrame) -> pd.DataFrame:
     df['has_geometry'] = df['geometry'].isnull()
     df = df.sort_values(by=['taz', 'has_geometry'])
     df['geometry'] = df['geometry'].fillna(method='pad')
-    agg_df = agg_df.drop('has_geometry', axis=1)
+    df = df.drop('has_geometry', axis=1)
     
     # Sort
-    agg_df = agg_df.sort_values(by=['date', 'hour', 'taz'])
+    df = df.sort_values(by=['date', 'hour', 'taz'])
     return df
 
 
@@ -175,7 +175,7 @@ def extract_driver_information(da: DriverAnalytics) -> pd.DataFrame:
     Returns:
         pd.DataFrame: driver data.
     """
-    col_info = ['datetime', 'taz', 'driver_id', 'from_lon', 'from_lat', 'to_lon', 'to_lat', 'is_oos', 'ontrip']
+    col_info = ['datetime', 'taz', 'driver_id', 'from_lon', 'from_lat', 'to_lon', 'to_lat', 'is_oos', 'ontrip', 'num_jobs']
     driver_df = pd.DataFrame(da.analytics, columns=col_info)
     if driver_df.empty:
         return None
@@ -195,6 +195,7 @@ def save_metadata(path: str):
         'INITIAL_TIME': INITIAL_TIME,
         'RUN_DELTA': RUN_DELTA,
         'BATCH_FREQUENCY': BATCH_FREQUENCY,
+        'MAX_DRIVER_JOB_QUEUE': MAX_DRIVER_JOB_QUEUE,
         'VERBOSE': VERBOSE,
         'DEBUG': DEBUG
     }

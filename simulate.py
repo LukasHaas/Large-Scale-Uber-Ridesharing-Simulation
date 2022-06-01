@@ -42,8 +42,9 @@ if __name__ == "__main__":
 
     # driver arrival process
     num_active_drivers = [0]
+    anticipated_active_drivers = [0]
     driver_process = DriverProcess(env, store, driver_collection, INITIAL_DRIVERS, \
-                                   num_active_drivers, geo_df, VERBOSE, DEBUG)
+                                   num_active_drivers, anticipated_active_drivers, geo_df, VERBOSE, DEBUG)
     env.process(driver_process.run())
     
     # rider arrival process

@@ -8,11 +8,13 @@ INITIAL_DRIVERS = None
 INITIAL_TIME = 0 * 24 * 60 + 0 * 60  # Monday @ midnight
 RUN_DELTA = 60 * 24
 BATCH_FREQUENCY = 1. / 3 # 20 seconds interval matching
+MAX_DRIVER_JOB_QUEUE = 2
 
 # Output control
 FUNCTION_TIMING = False
 VERBOSE = False
 DEBUG = False
+STALL_DRIVERS = False
 CLOCK_LOG_TIME = 1
 
 # Files

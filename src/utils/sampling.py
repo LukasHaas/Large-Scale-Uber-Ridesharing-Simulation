@@ -29,7 +29,8 @@ def sample_point_in_geometry(geometry: Polygon, num_samples: int) -> List[Polygo
     
     return points[0] if num_samples == 1 else points
 
-def sample_random_trip_time(hour_of_day: int, origin: int, destination: int, is_trip=False):
+def sample_random_trip_time(hour_of_day: int, origin: int, destination: int, \
+                            is_trip: bool=False, get_expected: bool=False):
     """
     Samples time needed from origin to destination by drawing from log-normal
     distribution based on the geometric mean and geometric standard deviation
@@ -43,5 +44,8 @@ def sample_random_trip_time(hour_of_day: int, origin: int, destination: int, is_
     time = np.random.lognormal(np.log(geo_mean), np.log(geo_std)) / 60
     if is_trip and time < MIN_TRIP_TIME:
         time = MIN_TRIP_TIME
-        
-    return time
+    
+    if get_expected == False:
+        return time
+
+    return time, TAZ_times['mean_travel_time']

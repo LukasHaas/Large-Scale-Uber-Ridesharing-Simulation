@@ -29,5 +29,5 @@ class DriverAnalytics(object):
             to_lon = driver.last_heading_to.coords.xy[0][0]
             to_lat = driver.last_heading_to.coords.xy[1][0]
 
-            driver_data = [datetime, driver.curr_pos, driver.num, from_lon, from_lat, to_lon, to_lat, driver.is_oos, driver.ontrip]
+            driver_data = [datetime, driver.curr_pos, driver.num, from_lon, from_lat, to_lon, to_lat, driver.is_oos, driver.ontrip, driver.num_jobs]
             self.analytics.append(driver_data)
