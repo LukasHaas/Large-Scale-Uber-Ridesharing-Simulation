@@ -4,8 +4,8 @@ from datetime import datetime
 UBER_MARKET_SHARE = 0.8
 MIN_TRIP_TIME = 1.
 START_DATE = datetime(year=2016, month=12, day=5)
-INITIAL_DRIVERS = 2160
-INITIAL_TIME = 0 * 24 * 60 + 12 * 60  # Monday @ noon
+INITIAL_DRIVERS = None
+INITIAL_TIME = 0 * 24 * 60 + 0 * 60  # Monday @ midnight
 RUN_DELTA = 60 * 24
 BATCH_FREQUENCY = 1. / 3 # 20 seconds interval matching
 

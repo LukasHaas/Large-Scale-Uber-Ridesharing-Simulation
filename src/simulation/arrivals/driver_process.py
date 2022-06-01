@@ -19,6 +19,15 @@ class DriverProcess(ArrivalProcess):
         # Load driver supply data
         self.num_driver_df = pd.read_csv(DRIVER_PATH, index_col=['hour', 'minute'])
         self.num_driver_df *= UBER_MARKET_SHARE
+
+        # Check if initial driver number set
+        if self.initial_drivers is None:
+            hour = (self.env.now / 60)
+            hour_of_day = int(hour % 24)
+            minute = int(self.env.now % 60)
+            self.initial_drivers = int(self.num_driver_df.loc[(hour_of_day, minute), 'n_drivers'])
+        
+        # Adjust for debug
         if DEBUG:
             self.num_driver_df /= 10
 

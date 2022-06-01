@@ -152,7 +152,6 @@ class Driver(object):
         Note: the process depends on how close the current number of online drivers
               matches the overall average number of online drivers at that time.
         """
-
         hour = (self.env.now / 60)
         hour_of_day = int(hour % 24)
         minute = int(self.env.now % 60)

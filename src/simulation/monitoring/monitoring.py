@@ -1,4 +1,5 @@
 import os
+from matplotlib.pyplot import axis
 import pandas as pd
 import geopandas as gpd
 from typing import List
@@ -54,6 +55,38 @@ def __get_taz_area(row, geo_df):
     return geo_df.loc[row['taz']]['AREA']
 
 
+def __match_with_geo_df(df: pd.DataFrame, geo_df: pd.DataFrame) -> pd.DataFrame:
+    """Adds geo data to the supplied dataframe.
+
+    Args:
+        df (pd.DataFrame): the dataframe to be matched with the geo data.
+        geo_df (pd.DataFrame): the dataframe containing the geo data.
+
+    Returns:
+        pd.DataFrame: the matched dataframe.
+    """
+    # Cartesian product
+    index = pd.MultiIndex.from_product(df.index.levels)
+    df = df.reindex(index).reset_index()
+
+    # Time
+    df['time'] = df.apply(__generate_log_time, axis=1)
+
+    # Get geometry
+    df['geometry'] = df.apply(lambda x: __get_taz_geometry(x, geo_df), axis=1)
+    df['area'] = df.apply(lambda x: __get_taz_area(x, geo_df), axis=1)
+
+    # Fill gaps
+    df['has_geometry'] = df['geometry'].isnull()
+    df = df.sort_values(by=['taz', 'has_geometry'])
+    df['geometry'] = df['geometry'].fillna(method='pad')
+    agg_df = agg_df.drop('has_geometry', axis=1)
+    
+    # Sort
+    agg_df = agg_df.sort_values(by=['date', 'hour', 'taz'])
+    return df
+
+
 def aggregate_rider_TAZ_information(ride_df: pd.DataFrame, geo_df: pd.DataFrame) -> pd.DataFrame:
     """Aggregates the rider information per TAZ.
 
@@ -66,18 +99,27 @@ def aggregate_rider_TAZ_information(ride_df: pd.DataFrame, geo_df: pd.DataFrame)
     """
     ride_df['date'] = ride_df['datetime'].apply(lambda x: x.split()[0])
     ride_df['hour'] = ride_df['datetime'].apply(lambda x: x.split()[1].split(':')[0])
+
     agg_df = ride_df.groupby(['date', 'hour', 'taz']).agg(
         num_requests=('ride_time', 'count'),
         share_cancelled=('cancelled', 'mean'),
         mean_match_wait=('match_wait_time', 'mean'),
         mean_driver_wait=('driver_wait_time', 'mean'),
-        time=('datetime', 'first'),
-    ).reset_index()
+    )
 
-    agg_df['geometry'] = agg_df.apply(lambda x: __get_taz_geometry(x, geo_df), axis=1)
-    agg_df['area'] = agg_df.apply(lambda x: __get_taz_area(x, geo_df), axis=1)
+    # Add geo data
+    agg_df = __match_with_geo_df(agg_df, geo_df)
+    agg_df['num_requests'] = agg_df['num_requests'].fillna(value=0)
+
+    # Compute driver densities
     agg_df['rider_density'] = agg_df['num_requests'] / agg_df['area']
     return agg_df
+
+
+def __generate_log_time(row):
+    date = row['date']
+    hour = row['hour']
+    return f'{date} {hour}:00:00'
 
 
 def aggregate_driver_TAZ_information(driver_df: pd.DataFrame, geo_df: pd.DataFrame) -> pd.DataFrame:
@@ -92,17 +134,26 @@ def aggregate_driver_TAZ_information(driver_df: pd.DataFrame, geo_df: pd.DataFra
     """
     driver_df['date'] = driver_df['datetime'].apply(lambda x: x.split()[0])
     driver_df['hour'] = driver_df['datetime'].apply(lambda x: x.split()[1].split(':')[0])
+
     agg_df = driver_df.groupby(['date', 'hour', 'taz']).agg(
         num_drivers=('driver_id', 'count'),
         share_idle=('idle', 'mean'),
         share_oos=('is_oos', 'mean'),
         share_passenger_trip=('passenger_drive', 'mean'),
-        time=('datetime', 'first'),
-    ).reset_index()
+    )
 
-    agg_df['geometry'] = agg_df.apply(lambda x: __get_taz_geometry(x, geo_df), axis=1)
-    agg_df['area'] = agg_df.apply(lambda x: __get_taz_area(x, geo_df), axis=1)
+    # Add geo data
+    agg_df = __match_with_geo_df(agg_df, geo_df)
+    agg_df['num_drivers'] = agg_df['num_drivers'].fillna(value=0)
+
+    # Compute driver densities
     agg_df['driver_density'] = agg_df['num_drivers'] / agg_df['area']
+
+    # Remove before and after
+    #min_date, max_date = driver_df['date'].min(), driver_df['date'].max()
+    #remove_indices = agg_df.loc[((agg_df['date'] == min_date) & (agg_df['hour'] < 3)) |
+    #                            ((agg_df['date'] == max_date) & (agg_df['hour'] >= 3))]
+
     return agg_df
 
 
@@ -176,6 +227,7 @@ def save_run(ride_collection: List, da: DriverAnalytics, geo_df: pd.DataFrame):
         driver_taz_agg_df.to_csv(new_dir + '/driver_taz_info.csv', index=False)
 
     save_metadata(new_dir)
+    print('Simulation data successfully saved.')
 
 if __name__ == '__main__':
     __create_new_run()
