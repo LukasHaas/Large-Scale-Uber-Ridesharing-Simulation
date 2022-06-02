@@ -1,6 +1,7 @@
 from typing import List
 import numpy as np
 import pandas as pd
+import random
 import simpy
 from simpy.core import Environment
 from simpy.resources.store import FilterStore
@@ -200,14 +201,20 @@ class Driver(object):
         Note: the process depends on how close the current number of online drivers
               matches the overall average number of online drivers at that time.
         """
+        # TODO: anticipated drivers seems to be too high
+        # Get target supply
         hour = (self.env.now / 60)
         hour_of_day = int(hour % 24)
         minute = int(self.env.now % 60)
         target_uber_supply = self.num_driver_df.loc[(hour_of_day, minute), 'n_drivers']
-        num_active = self.anticipated_active_drivers[0]
-        self.will_head_home = (num_active > target_uber_supply) and self.num_trips > 0
-        if self.will_head_home:
-            self.anticipated_active_drivers[0] -= 1
+
+        # Decide if to go home
+        num_active = self.num_active_drivers[0] #self.anticipated_active_drivers[0]
+        could_head_home = ((num_active > target_uber_supply) and self.num_trips > 0)
+        surplus = num_active - target_uber_supply
+        probability = min(1, surplus / (num_active / 7.5)) # surplus should be gone within 8 minutes
+        if could_head_home and random.random() < probability:
+            self.will_head_home = True
 
 
     def wait_for_request(self):

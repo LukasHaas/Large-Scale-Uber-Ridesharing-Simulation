@@ -60,10 +60,12 @@ if __name__ == "__main__":
     # clock
     clock = None
     if CLOCK_LOG_TIME is not None:
-        clock = Clock(env, num_active_drivers, num_active_requests, CLOCK_LOG_TIME)
+        clock = Clock(env, num_active_drivers, anticipated_active_drivers, num_active_requests, CLOCK_LOG_TIME)
         env.process(clock.run())
 
     # Run simulation
+    print('Starting simulation.')
+    print('=' * 50)
     env.run(until=INITIAL_TIME + RUN_DELTA)
 
     # Save simulation data

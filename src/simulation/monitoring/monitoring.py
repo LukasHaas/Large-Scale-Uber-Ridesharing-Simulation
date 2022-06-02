@@ -217,8 +217,8 @@ def save_clock_data(clock: Clock) -> pd.DataFrame:
     Returns:
         pd.DataFrame: datframe containing time and active participants.
     """
-    col_names = ['time', 'drivers', 'riders_and_requests']
-    clock_df = pd.DataFrame(clock.active_participants, columns=col_names)
+    col_names = ['time', 'drivers', 'riders_and_requests', 'ratio']
+    clock_df = pd.DataFrame(clock.data, columns=col_names)
     return clock_df
 
 
