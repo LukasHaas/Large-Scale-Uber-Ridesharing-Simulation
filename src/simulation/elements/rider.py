@@ -9,12 +9,13 @@ from .job import Job
 
 class Rider(object):
     def __init__(self, num: int, trip_endpoint_data: pd.DataFrame, geo_df: pd.DataFrame, env: Environment,
-                 request_store: FilterStore, request_collection: List, verbose: bool=True):
+                 request_store: FilterStore, request_collection: List, num_active_requests: List, verbose: bool=True):
         self.num = num
         self.trip_endpoint_data = trip_endpoint_data
         self.geo_df = geo_df
         self.env = env
         self.request_store = request_store
+        self.num_active_requests = num_active_requests
         self.verbose = verbose
         
         # Variables to keep track off
@@ -97,6 +98,9 @@ class Rider(object):
             - Geospatial pickup TAZ distribution
             - Geospatial dropoff TAZ destination
         """
+        # Set status to active
+        self.num_active_requests[0] += 1
+
         # Wait for pickup
         self.request_store.put((self.env.now, self))
         if self.verbose:
@@ -107,25 +111,30 @@ class Rider(object):
         except simpy.Interrupt:
             pass
         
-        end_time = self.env.now
-        self.wait_time = end_time - self.start_wait_time
+        self.wait_time = self.env.now - self.start_wait_time
         if self.wait_time >= self.match_patience:
+            self.__available = False
+            self.num_active_requests[0] -= 1
             if self.verbose:
                 print(f'{cdate(self.env.now)}: Rider {self.num:6.0f} waited too long for match -> cancelled')
             return
         
-        self.matched_with_driver = True
-        
         # Got matched with driver, waiting for driver arrival
+        self.matched_with_driver = True
         if self.verbose:
-            print(f'{cdate(self.env.now)}: Rider {self.num:6.0f} got matched, waited for {self.wait_time:2.2f} @ TAZ {self.pos}')
+            print(f'{cdate(self.env.now)}: Rider {self.num:6.0f} got matched. Waited for {self.wait_time:2.2f} @ TAZ {self.pos}')
         yield self.env.process(self.wait_for_pickup())
         
-        # Complete trip
+        # Driver arrived
         if self.verbose:
-            print(f'{cdate(self.env.now)}: Rider {self.num:6.0f} starts trip, waited for {self.driver_wait_time:2.2f} @ TAZ {self.pos}')
+            print(f'{cdate(self.env.now)}: Rider {self.num:6.0f} starts trip. Waited for {self.driver_wait_time:2.2f} @ TAZ {self.pos}')
+
+        # Complete trip
         yield self.env.timeout(self.ride_time)
         self.completed = True
+        self.num_active_requests[0] -= 1
+        if self.verbose:
+            print(f'{cdate(self.env.now)}: Rider {self.num:6.0f} arrived @ TAZ {self.des}')
         
 
     def set_trip_duration(self, job: Job):
@@ -145,8 +154,6 @@ class Rider(object):
             yield self.env.timeout(simpy.core.Infinity)
         else:
             yield self.env.timeout(self.match_patience)
-        
-        self.__available = False
 
             
     def wait_for_pickup(self):

@@ -6,7 +6,7 @@ MIN_TRIP_TIME = 1.
 START_DATE = datetime(year=2016, month=12, day=5)
 INITIAL_DRIVERS = None
 INITIAL_TIME = 0 * 24 * 60 + 0 * 60  # Monday @ midnight
-RUN_DELTA = 60 * 24
+RUN_DELTA = 60
 BATCH_FREQUENCY = 1. / 3 # 20 seconds interval matching
 MAX_DRIVER_JOB_QUEUE = 2
 

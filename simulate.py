@@ -43,12 +43,14 @@ if __name__ == "__main__":
     # driver arrival process
     num_active_drivers = [0]
     anticipated_active_drivers = [0]
-    driver_process = DriverProcess(env, store, driver_collection, INITIAL_DRIVERS, \
+    driver_process = DriverProcess(env, store, driver_collection, INITIAL_DRIVERS,
                                    num_active_drivers, anticipated_active_drivers, geo_df, VERBOSE, DEBUG)
     env.process(driver_process.run())
     
     # rider arrival process
-    rider_process = RiderProcess(env, store, request_collection, arrival_df, geo_df, VERBOSE, DEBUG)
+    num_active_requests = [0]
+    rider_process = RiderProcess(env, store, request_collection, arrival_df, geo_df, num_active_requests, 
+                                 VERBOSE, DEBUG)
     env.process(rider_process.run())
 
     # driver analytics
@@ -56,12 +58,13 @@ if __name__ == "__main__":
     env.process(da.analyse())
 
     # clock
+    clock = None
     if CLOCK_LOG_TIME is not None:
-        clock = Clock(env, num_active_drivers, CLOCK_LOG_TIME)
+        clock = Clock(env, num_active_drivers, num_active_requests, CLOCK_LOG_TIME)
         env.process(clock.run())
 
     # Run simulation
     env.run(until=INITIAL_TIME + RUN_DELTA)
 
     # Save simulation data
-    save_run(request_collection, da, geo_df)
+    save_run(request_collection, da, geo_df, clock)

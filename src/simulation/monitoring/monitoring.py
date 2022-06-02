@@ -4,6 +4,7 @@ import pandas as pd
 import geopandas as gpd
 from typing import List
 from datetime import datetime
+from src.utils.clock import Clock
 from src.simulation.params import *
 from src.utils.formatting import cdate
 from .driver_analytics import DriverAnalytics
@@ -207,7 +208,21 @@ def save_metadata(path: str):
             f.write(f'{key}: {value}\n')
 
 
-def save_run(ride_collection: List, da: DriverAnalytics, geo_df: pd.DataFrame):
+def save_clock_data(clock: Clock) -> pd.DataFrame:
+    """Saves the number of active drivers and riders at any given time.
+
+    Args:
+        clock (Clock): clock giving high-level market thickness overviews.
+
+    Returns:
+        pd.DataFrame: datframe containing time and active participants.
+    """
+    col_names = ['time', 'drivers', 'riders_and_requests']
+    clock_df = pd.DataFrame(clock.active_participants, columns=col_names)
+    return clock_df
+
+
+def save_run(ride_collection: List, da: DriverAnalytics, geo_df: pd.DataFrame, clock: Clock=None):
     """Logs all relevant information from the simulation.
 
     Args:
@@ -226,6 +241,10 @@ def save_run(ride_collection: List, da: DriverAnalytics, geo_df: pd.DataFrame):
 
         driver_taz_agg_df = aggregate_driver_TAZ_information(driver_info_df, geo_df)
         driver_taz_agg_df.to_csv(new_dir + '/driver_taz_info.csv', index=False)
+
+    if clock is not None:
+        clock_df = save_clock_data(clock)
+        clock_df.to_csv(new_dir + '/clock_info.csv', index=False)
 
     save_metadata(new_dir)
     print('Simulation data successfully saved.')
