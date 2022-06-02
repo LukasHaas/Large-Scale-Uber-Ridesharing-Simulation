@@ -40,6 +40,7 @@ class DriverProcess(ArrivalProcess):
         self.trip_endpoint_data = pd.read_csv(PICKUP_DROPOFF_PATH, index_col=['day_of_week', 'hour'])
 
         # Spawn initial drivers
+        print('Generating initial drivers ...')
         self.spawn_initial_drivers()
 
     

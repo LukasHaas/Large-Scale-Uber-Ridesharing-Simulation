@@ -32,9 +32,10 @@ class RiderProcess(ArrivalProcess):
         hour_of_day = int(hour % 24)
         minute = int(self.env.now % 60)
         weekday = int((self.env.now / 60 / 24) % 7)
-        self.initial_riders = int(self.arrival_df.loc[(weekday, hour_of_day, minute)]) # Get hour equivalent of riders
+        self.initial_riders = int(self.arrival_df.loc[(weekday, hour_of_day, minute)] / 4) # Get 15-min equivalent of riders
 
         # Spawn intitial riders
+        print('Generating initial riders ...')
         self.spawn_riders(n=self.initial_riders)
 
 
