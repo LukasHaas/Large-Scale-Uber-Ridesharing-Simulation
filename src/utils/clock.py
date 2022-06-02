@@ -3,12 +3,11 @@ from simpy.core import Environment
 from src.utils.formatting import cdate
 
 class Clock(object):
-    def __init__(self, env: Environment, num_active_drivers: List, anticipated_active_drivers: List, 
+    def __init__(self, env: Environment, num_active_drivers: List,
                  num_active_requests: List, interval: float):
         self.env = env
         self.interval = interval
         self.__num_active_drivers = num_active_drivers
-        self.anticipated_active_drivers = anticipated_active_drivers
         self.__num_active_requests = num_active_requests
         self.data = []
 

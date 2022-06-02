@@ -11,8 +11,7 @@ from src.utils.sampling import sample_point_in_geometry
 
 class Driver(object):
     def __init__(self, num: int, trip_endpoint_data: pd.DataFrame, geo_df: pd.DataFrame, num_driver_df: pd.DataFrame, env: Environment,
-                 driver_store: FilterStore, driver_collection: List, num_active_drivers: List, anticipated_active_drivers: List,
-                 verbose: bool=True):
+                 driver_store: FilterStore, driver_collection: List, num_active_drivers: List, num_active_riders: List, verbose: bool=True):
         """Instantiates a driver element for the simulation.
 
         Args:
@@ -24,8 +23,7 @@ class Driver(object):
             driver_store (FilterStore): container of all available drivers
             driver_collection (List): list of all drivers
             num_active_drivers (List): list containing one number which is the current number of active drivers
-            anticipated_active_drivers (List): list containing one number which is the anticipated number of active drivers
-                                               once every driver has emptied their job queue.
+            num_active_riders (List): list containing one number which is the current number of active riders
             verbose (bool, optional): verbose setting. Defaults to True.
         """
         self.num = num
@@ -33,7 +31,7 @@ class Driver(object):
         self.driver_store = driver_store
         self.num_driver_df = num_driver_df
         self.num_active_drivers = num_active_drivers
-        self.anticipated_active_drivers = anticipated_active_drivers
+        self.num_active_riders = num_active_riders
         self.verbose = verbose
         
         # Determine hour of day and weekday
@@ -180,7 +178,6 @@ class Driver(object):
     def go_offline(self):
         """Sets driver to offline.
         """
-        self.num_active_drivers[0] -= 1
         self.online = False
 
     
@@ -188,7 +185,6 @@ class Driver(object):
         """Sets driver to online.
         """
         self.num_active_drivers[0] += 1
-        self.anticipated_active_drivers[0] += 1
         self.online = True
         
         # Signal availability
@@ -209,11 +205,19 @@ class Driver(object):
         target_uber_supply = self.num_driver_df.loc[(hour_of_day, minute), 'n_drivers']
 
         # Decide if to go home
-        num_active = self.num_active_drivers[0] #self.anticipated_active_drivers[0]
-        could_head_home = ((num_active > target_uber_supply) and self.num_trips > 0)
-        surplus = num_active - target_uber_supply
-        probability = min(1, surplus / (num_active / 7.5)) # surplus should be gone within 8 minutes
-        if could_head_home and random.random() < probability:
+        ratio = self.num_active_drivers[0] / self.num_active_riders[0]
+        if ratio > 1.25:
+            # Overwrite probability if supply far outstrips demand (> 125% ratio)
+            probability = min(1, ratio - 1)
+        elif ratio > 0.9:
+            # Calculate base probability based on TNC supply patterns
+            surplus = self.num_active_drivers[0] - target_uber_supply
+            probability = min(1, surplus / (self.num_active_drivers[0] / 7.5)) # surplus should be gone within 8 minutes
+        else:
+            return
+
+        # Head home if makes sense to do so
+        if self.num_trips > 0 and random.random() < probability:
             self.will_head_home = True
 
 

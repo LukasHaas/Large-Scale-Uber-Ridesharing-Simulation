@@ -40,18 +40,19 @@ if __name__ == "__main__":
 
     env.process(matcher.perform_matching())
 
-    # driver arrival process
-    num_active_drivers = [0]
-    anticipated_active_drivers = [0]
-    driver_process = DriverProcess(env, store, driver_collection, INITIAL_DRIVERS,
-                                   num_active_drivers, anticipated_active_drivers, geo_df, VERBOSE, DEBUG)
-    env.process(driver_process.run())
-    
     # rider arrival process
     num_active_requests = [0]
     rider_process = RiderProcess(env, store, request_collection, arrival_df, geo_df, num_active_requests, 
                                  VERBOSE, DEBUG)
     env.process(rider_process.run())
+
+    # driver arrival process
+    num_active_drivers = [0]
+    driver_process = DriverProcess(env, store, driver_collection, INITIAL_DRIVERS,
+                                   num_active_drivers, num_active_requests, geo_df, VERBOSE, DEBUG)
+    env.process(driver_process.run())
+    
+
 
     # driver analytics
     da = DriverAnalytics(env, driver_collection)
@@ -60,7 +61,7 @@ if __name__ == "__main__":
     # clock
     clock = None
     if CLOCK_LOG_TIME is not None:
-        clock = Clock(env, num_active_drivers, anticipated_active_drivers, num_active_requests, CLOCK_LOG_TIME)
+        clock = Clock(env, num_active_drivers, num_active_requests, CLOCK_LOG_TIME)
         env.process(clock.run())
 
     # Run simulation

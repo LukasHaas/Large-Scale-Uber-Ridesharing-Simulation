@@ -1,5 +1,6 @@
 import pandas as pd
 from typing import List
+import random
 from simpy.core import Environment
 from simpy.resources.store import FilterStore
 from .arrival_process import ArrivalProcess
@@ -8,14 +9,14 @@ from src.simulation.params import PICKUP_DROPOFF_PATH, DRIVER_PATH, UBER_MARKET_
 
 class DriverProcess(ArrivalProcess):
     def __init__(self, env: Environment, store: FilterStore, collection: List, initial_drivers: int, \
-                 num_active_drivers: List, anticipated_active_drivers: List, geo_df: pd.DataFrame, \
+                 num_active_drivers: List, num_active_riders: List, geo_df: pd.DataFrame, \
                  verbose: bool = True, debug: bool = False):
         super().__init__(env, store, collection, verbose, debug)
         self.initial_drivers = initial_drivers
         self.geo_df = geo_df
         self.driver_number = 0
         self.__num_active_drivers = num_active_drivers
-        self.anticipated_active_drivers = anticipated_active_drivers
+        self.__num_active_riders = num_active_riders
         self.drivers = []
 
         # Load driver supply data
@@ -48,6 +49,10 @@ class DriverProcess(ArrivalProcess):
     def num_active_drivers(self):
         return self.__num_active_drivers[0]
 
+    @property
+    def num_active_riders(self):
+        return self.__num_active_riders[0]
+
 
     def dispatch_drivers(self, n: int):
         """Dispatches n drivers.
@@ -57,7 +62,7 @@ class DriverProcess(ArrivalProcess):
         """
         for _ in range(n):
             Driver(self.driver_number, self.trip_endpoint_data, self.geo_df, self.num_driver_df, self.env,
-                   self.store, self.collection, self.__num_active_drivers, self.anticipated_active_drivers,
+                   self.store, self.collection, self.__num_active_drivers, self.__num_active_riders,
                    self.verbose)
             self.driver_number += 1
 
@@ -95,6 +100,15 @@ class DriverProcess(ArrivalProcess):
             num_active = self.num_active_drivers
             
             # If current supply is not high enough, dispatch drivers
-            if target_uber_supply > num_active:
+            ratio = self.num_active_drivers / self.num_active_riders
+            if ratio <= 0.9:
+                drivers_to_spawn = int(0.005 * self.num_active_drivers)
+                self.dispatch_drivers(drivers_to_spawn)
+
+            elif target_uber_supply > num_active:
                 deficit = int(target_uber_supply - num_active)
+                drivers_to_spawn = int(random.uniform(0, 1.1) * deficit)
                 self.dispatch_drivers(deficit)
+
+            else:
+                pass
