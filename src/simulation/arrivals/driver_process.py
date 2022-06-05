@@ -5,16 +5,18 @@ from simpy.core import Environment
 from simpy.resources.store import FilterStore
 from .arrival_process import ArrivalProcess
 from src.simulation.elements import Driver
-from src.simulation.params import PICKUP_DROPOFF_PATH, DRIVER_PATH, UBER_MARKET_SHARE, DEBUG, STALL_DRIVERS
+from src.simulation.params import PICKUP_DROPOFF_PATH, DRIVER_PATH, UBER_MARKET_SHARE, \
+                                  STALL_DRIVERS, DYNAMIC_SUPPLY, MARKET_FORCE_SUPPLY
 
 class DriverProcess(ArrivalProcess):
-    def __init__(self, env: Environment, store: FilterStore, collection: List, initial_drivers: int, \
-                 num_active_drivers: List, num_active_riders: List, geo_df: pd.DataFrame, \
+    def __init__(self, env: Environment, store: FilterStore, collection: List, initial_drivers: int,
+                 num_active_drivers: List, num_active_riders: List, arrival_df: pd.DataFrame, geo_df: pd.DataFrame,
                  verbose: bool = True, debug: bool = False):
         super().__init__(env, store, collection, verbose, debug)
         self.initial_drivers = initial_drivers
         self.geo_df = geo_df
         self.driver_number = 0
+        self.arrival_df = arrival_df
         self.__num_active_drivers = num_active_drivers
         self.__num_active_riders = num_active_riders
         self.drivers = []
@@ -94,21 +96,30 @@ class DriverProcess(ArrivalProcess):
             minute = int(self.env.now % 60)   
             hour = self.env.now / 60
             hour_of_day = int(hour % 24)
+            weekday = int((self.env.now / 60 / 24) % 7)
             
             # Monitor current supply of drivers
             target_uber_supply = self.num_driver_df.loc[(hour_of_day, minute), 'n_drivers']
+            # mean_riders = int(self.arrival_df.loc[(weekday, hour_of_day, minute)])
             num_active = self.num_active_drivers
             
-            # If current supply is not high enough, dispatch drivers
-            ratio = self.num_active_drivers / self.num_active_riders
-            if ratio <= 0.9:
-                drivers_to_spawn = int(0.005 * self.num_active_drivers)
-                self.dispatch_drivers(drivers_to_spawn)
+            if MARKET_FORCE_SUPPLY:
+                raise NotImplementedError() # TODO: Implement
 
-            elif target_uber_supply > num_active:
-                deficit = int(target_uber_supply - num_active)
-                drivers_to_spawn = int(random.uniform(0, 1.1) * deficit)
-                self.dispatch_drivers(deficit)
+                # If current supply is not high enough, dispatch drivers
+                # ratio = target_uber_supply / mean_riders
+                # if ratio <= 0.9:
+                #     drivers_to_spawn = int(0.005 * self.num_active_drivers)
+                #     self.dispatch_drivers(drivers_to_spawn)
 
+                # # If ratio is less than 125%, use TNC data
+                # elif ratio < 1.25:
+                #     deficit = int(target_uber_supply - num_active)
+                #     drivers_to_spawn = int(random.uniform(0, 1.1) * deficit)
+                #     self.dispatch_drivers(deficit)
+
+            # Don't add drivers otherwise
             else:
-                pass
+                deficit = int(target_uber_supply - num_active)
+                drivers_to_spawn = int(random.uniform(0, 0.5) * deficit)
+                self.dispatch_drivers(drivers_to_spawn)

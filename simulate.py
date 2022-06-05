@@ -7,9 +7,7 @@ from src.simulation.matcher import IncrementalMatcher, BatchMatcher
 from src.simulation.arrivals import RiderProcess, DriverProcess
 from src.simulation.matcher.batch_matcher import BatchMatcher
 from src.simulation.monitoring import save_run, DriverAnalytics
-from src.simulation.params import RUN_DELTA, INITIAL_TIME, INITIAL_DRIVERS, VERBOSE, \
-                                  DEBUG, ARRIVAL_PATH, TRAVEL_TIMES_PATH, \
-                                  TAZ_GEOMETRY_PATH, BATCH_FREQUENCY, CLOCK_LOG_TIME
+from src.simulation.params import *
 
 if __name__ == "__main__":
     # Analysis Containers
@@ -23,13 +21,13 @@ if __name__ == "__main__":
     geo_df = pd.read_csv(TAZ_GEOMETRY_PATH, index_col=['MOVEMENT_ID_uber'])
     geo_df['geometry'] = gpd.GeoSeries.from_wkt(geo_df['geometry'])
 
-    # creates a SimPy Environment
+    # Creates a SimPy Environment
     env = simpy.Environment(initial_time=INITIAL_TIME)
 
-    # create store for available drivers and riders
+    # Create store for available drivers and riders
     store = simpy.FilterStore(env, capacity=simpy.core.Infinity)
     
-    # instantiate matching algorithm
+    # Instantiate matching algorithm
     if BATCH_FREQUENCY is None:
         algorithm = GreedyMatcher(uber_data=travel_time_df, distance_based=False)
         matcher = IncrementalMatcher(env, algorithm, store, trip_collection, VERBOSE)
@@ -40,25 +38,24 @@ if __name__ == "__main__":
 
     env.process(matcher.perform_matching())
 
-    # rider arrival process
+    # Fider arrival process
     num_active_requests = [0]
     rider_process = RiderProcess(env, store, request_collection, arrival_df, geo_df, num_active_requests, 
                                  VERBOSE, DEBUG)
     env.process(rider_process.run())
 
-    # driver arrival process
+    # Driver arrival process
     num_active_drivers = [0]
-    driver_process = DriverProcess(env, store, driver_collection, INITIAL_DRIVERS,
-                                   num_active_drivers, num_active_requests, geo_df, VERBOSE, DEBUG)
-    env.process(driver_process.run())
+    driver_process = DriverProcess(env, store, driver_collection, INITIAL_DRIVERS, num_active_drivers,
+                                   num_active_requests, arrival_df, geo_df, VERBOSE, DEBUG)
+    if DYNAMIC_SUPPLY:
+        env.process(driver_process.run())
     
-
-
-    # driver analytics
+    # Driver analytics
     da = DriverAnalytics(env, driver_collection)
     env.process(da.analyse())
 
-    # clock
+    # Clock
     clock = None
     if CLOCK_LOG_TIME is not None:
         clock = Clock(env, num_active_drivers, num_active_requests, CLOCK_LOG_TIME)
@@ -66,8 +63,10 @@ if __name__ == "__main__":
 
     # Run simulation
     print('Starting simulation.')
-    print('=' * 50)
+    print('=' * 80)
     env.run(until=INITIAL_TIME + RUN_DELTA)
 
     # Save simulation data
-    save_run(request_collection, da, geo_df, clock)
+    print('=' * 80)
+    save_run(request_collection, driver_collection, da, geo_df, clock)
+    print('=' * 80)

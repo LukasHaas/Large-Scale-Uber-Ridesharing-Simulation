@@ -6,7 +6,7 @@ import simpy
 from simpy.core import Environment
 from simpy.resources.store import FilterStore
 from src.utils import cdate
-from src.simulation.params import INITIAL_TIME, MAX_DRIVER_JOB_QUEUE
+from src.simulation.params import INITIAL_TIME, MAX_DRIVER_JOB_QUEUE, DYNAMIC_SUPPLY, MARKET_FORCE_SUPPLY
 from src.utils.sampling import sample_point_in_geometry
 
 class Driver(object):
@@ -151,7 +151,8 @@ class Driver(object):
             yield self.env.process(self.complete_trip(self.curr_job))
 
             # Decide if should head home
-            self.should_head_home()
+            if DYNAMIC_SUPPLY or MARKET_FORCE_SUPPLY:
+                self.should_head_home()
                 
             # Update accepting jobs
             self.update_accepting_jobs_status()
@@ -179,6 +180,7 @@ class Driver(object):
         """Sets driver to offline.
         """
         self.online = False
+        self.num_active_drivers[0] -= 1
 
     
     def go_online(self):
@@ -205,19 +207,26 @@ class Driver(object):
         target_uber_supply = self.num_driver_df.loc[(hour_of_day, minute), 'n_drivers']
 
         # Decide if to go home
-        ratio = self.num_active_drivers[0] / self.num_active_riders[0]
-        if ratio > 1.25:
-            # Overwrite probability if supply far outstrips demand (> 125% ratio)
-            probability = min(1, ratio - 1)
-        elif ratio > 0.9:
-            # Calculate base probability based on TNC supply patterns
-            surplus = self.num_active_drivers[0] - target_uber_supply
-            probability = min(1, surplus / (self.num_active_drivers[0] / 7.5)) # surplus should be gone within 8 minutes
+        if MARKET_FORCE_SUPPLY:
+            raise NotImplementedError() # TODO: Implement
+            
+            # ratio = self.num_active_drivers[0] / self.num_active_riders[0]
+            # if ratio > 1.25:
+            #     # Overwrite probability if supply far outstrips demand (> 125% ratio)
+            #     probability = min(1, ratio - 1)
+            # elif ratio > 0.9:
+            #     # Calculate base probability based on TNC supply patterns
+            #     surplus = self.num_active_drivers[0] - target_uber_supply
+            #     probability = min(1, surplus / (self.num_active_drivers[0] / 7.5)) # surplus should be gone within 8 minutes
+            # else:
+            #     return
+
         else:
-            return
+            surplus = self.num_active_drivers[0] - target_uber_supply
+            probability = min(1, surplus / (self.num_active_drivers[0] / 7.5)) # surplus should be gone within 8 minutes (1/7.5 hours)
 
         # Head home if makes sense to do so
-        if self.num_trips > 0 and random.random() < probability:
+        if random.random() < probability:  # self.num_trips > 0 and 
             self.will_head_home = True
 
 

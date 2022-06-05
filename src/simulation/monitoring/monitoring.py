@@ -167,7 +167,7 @@ def __compute_driver_status(row):
         return 2
 
 
-def extract_driver_information(da: DriverAnalytics) -> pd.DataFrame:
+def extract_driver_snapshots(da: DriverAnalytics) -> pd.DataFrame:
     """Extract driver analytics data.
 
     Args:
@@ -187,6 +187,27 @@ def extract_driver_information(da: DriverAnalytics) -> pd.DataFrame:
     return driver_df
 
 
+def extract_driver_information(driver_collection: List) -> pd.DataFrame:
+    """Aggregates information from drivers for analysis.
+
+    Args:
+        driver_collection (List): list of all "Driver" objects.
+    """
+    drivers = []
+    for driver in driver_collection:
+        oos_wait = driver.oos_wait
+        oos_drive = driver.oos_drive
+        oos_total = driver.oos_total
+        service_drive = driver.trip_total
+        total_time_active = driver.total_time_active
+        num_jobs = driver.num_jobs
+        drivers.append([oos_wait, oos_drive, oos_total, service_drive, total_time_active, num_jobs])
+    
+    col_info = ['oos_wait', 'oos_drive', 'oos_total', 'service_drive', 'total_time_active', 'num_jobs']
+    driver_df = pd.DataFrame(drivers, columns=col_info)
+    return driver_df
+
+
 def save_metadata(path: str):
     data = {
         'UBER_MARKET_SHARE': UBER_MARKET_SHARE,
@@ -197,6 +218,8 @@ def save_metadata(path: str):
         'RUN_DELTA': RUN_DELTA,
         'BATCH_FREQUENCY': BATCH_FREQUENCY,
         'MAX_DRIVER_JOB_QUEUE': MAX_DRIVER_JOB_QUEUE,
+        'DYNAMIC_SUPPLY': DYNAMIC_SUPPLY,
+        'MARKET_FORCE_SUPPLY': MARKET_FORCE_SUPPLY,
         'VERBOSE': VERBOSE,
         'DEBUG': DEBUG
     }
@@ -222,24 +245,32 @@ def save_clock_data(clock: Clock) -> pd.DataFrame:
     return clock_df
 
 
-def save_run(ride_collection: List, da: DriverAnalytics, geo_df: pd.DataFrame, clock: Clock=None):
-    """Logs all relevant information from the simulation.
+def save_run(ride_collection: List, driver_collection: List, da: DriverAnalytics,
+             geo_df: pd.DataFrame, clock: Clock=None):
+    """Generates all analytics needed for analysis.
 
     Args:
-        ride_collection (List): list of all "Rider" objects.
+        ride_collection (List): list containing all rider objects
+        driver_collection (List): list containing all driver objects
+        da (DriverAnalytics): driver analytics object performing driver snapshots at time intervals
+        geo_df (pd.DataFrame): dataframe linking TAZs to geometries
+        clock (Clock, optional): models supply and demand side high-level analytics. Defaults to None.
     """
     new_dir = __create_new_run()
     ride_info_df = extract_ride_information(ride_collection)
     ride_info_df.to_csv(new_dir + '/ride_info.csv', index=False)
 
+    driver_info_df = extract_driver_information(driver_collection)
+    driver_info_df.to_csv(new_dir + '/driver_info.csv', index=False)
+
     rider_taz_agg_df = aggregate_rider_TAZ_information(ride_info_df, geo_df)
     rider_taz_agg_df.to_csv(new_dir + '/rider_taz_info.csv', index=False)
 
-    driver_info_df = extract_driver_information(da)
-    if driver_info_df is not None:
-        driver_info_df.to_csv(new_dir + '/driver_info.csv', index=False)
+    driver_snapshot_df = extract_driver_snapshots(da)
+    if driver_snapshot_df is not None:
+        driver_snapshot_df.to_csv(new_dir + '/driver_snapshots.csv', index=False)
 
-        driver_taz_agg_df = aggregate_driver_TAZ_information(driver_info_df, geo_df)
+        driver_taz_agg_df = aggregate_driver_TAZ_information(driver_snapshot_df, geo_df)
         driver_taz_agg_df.to_csv(new_dir + '/driver_taz_info.csv', index=False)
 
     if clock is not None:
