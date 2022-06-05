@@ -1,3 +1,3 @@
-from .greedy_matcher import GreedyMatcher
 from .rideshare_algorithm import RideShareMatchingAlgorithm
 from .shortest_distance import ShortestDistance
+from .prioritize_wait_times import PrioritizeWaitTimes

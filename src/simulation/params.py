@@ -6,16 +6,17 @@ MIN_TRIP_TIME = 1.
 START_DATE = datetime(year=2016, month=12, day=5)
 INITIAL_DRIVERS = None
 INITIAL_TIME = 3 * 24 * 60 + 0 * 60  # Wednesday @ midnight
-RUN_DELTA = 60 * 2
+RUN_DELTA = 60 * 4
 BATCH_FREQUENCY = 1. / 3 # 20 seconds interval matching
 MAX_DRIVER_JOB_QUEUE = 2
 DYNAMIC_SUPPLY = True
 MARKET_FORCE_SUPPLY = False # TODO: Implement working DYNAMIC_SUPPLY = True mode
+PRIORITIZE_WAIT_TIMES = True
 
 # Output control
 FUNCTION_TIMING = False
-VERBOSE = False
-DEBUG = False
+VERBOSE = True
+DEBUG = True
 STALL_DRIVERS = False
 CLOCK_LOG_TIME = 1
 

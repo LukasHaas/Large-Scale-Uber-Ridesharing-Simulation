@@ -6,7 +6,7 @@ from simpy.resources.store import FilterStore
 from .arrival_process import ArrivalProcess
 from src.simulation.elements import Driver
 from src.simulation.params import PICKUP_DROPOFF_PATH, DRIVER_PATH, UBER_MARKET_SHARE, \
-                                  STALL_DRIVERS, DYNAMIC_SUPPLY, MARKET_FORCE_SUPPLY
+                                  STALL_DRIVERS, MARKET_FORCE_SUPPLY
 
 class DriverProcess(ArrivalProcess):
     def __init__(self, env: Environment, store: FilterStore, collection: List, initial_drivers: int,
@@ -30,7 +30,7 @@ class DriverProcess(ArrivalProcess):
             hour = (self.env.now / 60)
             hour_of_day = int(hour % 24)
             minute = int(self.env.now % 60)
-            self.initial_drivers = int(self.num_driver_df.loc[(hour_of_day, minute), 'n_drivers'])
+            self.initial_drivers = int(self.num_driver_df.loc[(hour_of_day, minute), 'n_drivers'] / 4) # warmup start for matching
         
         # Adjust for debug
         if self.debug:
@@ -121,5 +121,5 @@ class DriverProcess(ArrivalProcess):
             # Don't add drivers otherwise
             else:
                 deficit = int(target_uber_supply - num_active)
-                drivers_to_spawn = int(random.uniform(0, 0.5) * deficit)
+                drivers_to_spawn = int(random.uniform(0, 0.25) * deficit)
                 self.dispatch_drivers(drivers_to_spawn)

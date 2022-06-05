@@ -13,31 +13,26 @@ class IncrementalMatcher(Matcher):
         """
         super().__init__(env, algorithm, trip_collection, verbose)
         self.store = store
+        self.available_drivers = []
+        self.available_requests = []
 
     def perform_matching(self):
         """
         Matches drivers to riders to service requests in an incremental manner.
         """
-        available_drivers = []
-        available_requests = []
-        
         while True:
             _, new_item = yield self.store.get(lambda x: x[1].available)
             if isinstance(new_item, Driver):
-                available_drivers.append(new_item)
+                self.available_drivers.append(new_item)
             else:
-                available_requests.append(new_item)
+                self.available_requests.append(new_item)
                 
             # Update availabilities
-            available_drivers = [x for x in available_drivers if x.available]
-            available_requests = [x for x in available_requests if x.available]
-
-            # print(f'----- PRE : Driver Pool: {len(available_drivers)}, Rider Pool: {len(available_requests)}')
+            self.available_drivers = [x for x in self.available_drivers if x.available]
+            self.available_requests = [x for x in self.available_requests if x.available]
 
             # Get items and compute matches
-            matches, available_requests, available_drivers = \
-                self.algorithm.create_matches(self.env.now, available_requests, available_drivers)
-            # print(f'----- POST: Driver Pool: {len(available_drivers)}, Rider Pool: {len(available_requests)}')
+            matches = self.algorithm.create_matches(self.env.now, self.available_requests, self.available_drivers)
 
             # Create trips with matches
             for match in matches:

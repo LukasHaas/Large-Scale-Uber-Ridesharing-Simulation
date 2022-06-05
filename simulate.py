@@ -2,7 +2,7 @@ import pandas as pd
 import geopandas as gpd
 import simpy
 from src.utils import Clock
-from src.simulation.algorithms import GreedyMatcher, ShortestDistance
+from src.simulation.algorithms import ShortestDistance, PrioritizeWaitTimes
 from src.simulation.matcher import IncrementalMatcher, BatchMatcher
 from src.simulation.arrivals import RiderProcess, DriverProcess
 from src.simulation.matcher.batch_matcher import BatchMatcher
@@ -28,11 +28,16 @@ if __name__ == "__main__":
     store = simpy.FilterStore(env, capacity=simpy.core.Infinity)
     
     # Instantiate matching algorithm
-    if BATCH_FREQUENCY is None:
-        algorithm = GreedyMatcher(uber_data=travel_time_df, distance_based=False)
-        matcher = IncrementalMatcher(env, algorithm, store, trip_collection, VERBOSE)
+    if PRIORITIZE_WAIT_TIMES:
+        algorithm = PrioritizeWaitTimes(uber_data=travel_time_df)
     else:
         algorithm = ShortestDistance(uber_data=travel_time_df)
+    
+    # Determine matching interval
+    if BATCH_FREQUENCY is None:
+        #algorithm = GreedyMatcher(uber_data=travel_time_df, distance_based=False)
+        matcher = IncrementalMatcher(env, algorithm, store, trip_collection, VERBOSE)
+    else:
         matcher = BatchMatcher(env, algorithm, BATCH_FREQUENCY, store, trip_collection, VERBOSE)
         env.process(matcher.keep_running_availabilities())
 
@@ -68,5 +73,5 @@ if __name__ == "__main__":
 
     # Save simulation data
     print('=' * 80)
-    save_run(request_collection, driver_collection, da, geo_df, clock)
+    save_run(request_collection, driver_collection, da, geo_df, algorithm, clock)
     print('=' * 80)

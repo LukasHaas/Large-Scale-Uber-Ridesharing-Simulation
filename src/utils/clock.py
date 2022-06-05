@@ -17,7 +17,7 @@ class Clock(object):
         while True:
             yield self.env.timeout(self.interval)
             time_string = cdate(self.env.now)
-            datetime = cdate(self.env.no, format_str=KEPLER_STR)
+            datetime = cdate(self.env.now, format_str=KEPLER_STR)
             ratio = (100 * self.num_active_drivers) / self.num_active_requests
             self.data.append([datetime, self.num_active_drivers, self.num_active_requests, ratio])
             print(f'{time_string}: Active drivers: {self.num_active_drivers:,} <> {self.num_active_requests:,} active riders/requests. Ratio: {ratio:.1f} %')

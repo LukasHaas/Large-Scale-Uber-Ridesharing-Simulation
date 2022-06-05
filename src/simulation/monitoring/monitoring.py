@@ -1,5 +1,5 @@
 import os
-from matplotlib.pyplot import axis
+import json
 import pandas as pd
 import geopandas as gpd
 from typing import List
@@ -7,6 +7,7 @@ from datetime import datetime
 from src.utils.clock import Clock
 from src.simulation.params import *
 from src.utils.formatting import cdate
+from src.simulation.algorithms import RideShareMatchingAlgorithm
 from .driver_analytics import DriverAnalytics
 
 KEPLER_STR = '%Y/%m/%d %H:%M:%S'
@@ -208,7 +209,7 @@ def extract_driver_information(driver_collection: List) -> pd.DataFrame:
     return driver_df
 
 
-def save_metadata(path: str):
+def save_metadata(path: str, algorithm: RideShareMatchingAlgorithm):
     data = {
         'UBER_MARKET_SHARE': UBER_MARKET_SHARE,
         'MIN_TRIP_TIME': MIN_TRIP_TIME,
@@ -218,17 +219,24 @@ def save_metadata(path: str):
         'RUN_DELTA': RUN_DELTA,
         'BATCH_FREQUENCY': BATCH_FREQUENCY,
         'MAX_DRIVER_JOB_QUEUE': MAX_DRIVER_JOB_QUEUE,
+        'ALGORITHM': algorithm.__class__.__name__,
         'DYNAMIC_SUPPLY': DYNAMIC_SUPPLY,
         'MARKET_FORCE_SUPPLY': MARKET_FORCE_SUPPLY,
         'VERBOSE': VERBOSE,
         'DEBUG': DEBUG
     }
+
+    # Save to file
     with open(path + '/metadata.txt', 'w+') as f:
         f.write('SIMULATION METADATA\n')
         f.write('=' * 50)
         f.write('\n')
         for key, value in data.items():
             f.write(f'{key}: {value}\n')
+
+    # Pretty print parameters
+    del data['START_DATE']
+    print(json.dumps(data, indent=4))
 
 
 def save_clock_data(clock: Clock) -> pd.DataFrame:
@@ -246,7 +254,7 @@ def save_clock_data(clock: Clock) -> pd.DataFrame:
 
 
 def save_run(ride_collection: List, driver_collection: List, da: DriverAnalytics,
-             geo_df: pd.DataFrame, clock: Clock=None):
+             geo_df: pd.DataFrame, algorithm: RideShareMatchingAlgorithm, clock: Clock=None):
     """Generates all analytics needed for analysis.
 
     Args:
@@ -254,6 +262,7 @@ def save_run(ride_collection: List, driver_collection: List, da: DriverAnalytics
         driver_collection (List): list containing all driver objects
         da (DriverAnalytics): driver analytics object performing driver snapshots at time intervals
         geo_df (pd.DataFrame): dataframe linking TAZs to geometries
+        algorithm (RideShareMatchingAlgorithm): algorithm used in simulation
         clock (Clock, optional): models supply and demand side high-level analytics. Defaults to None.
     """
     new_dir = __create_new_run()
@@ -277,7 +286,7 @@ def save_run(ride_collection: List, driver_collection: List, da: DriverAnalytics
         clock_df = save_clock_data(clock)
         clock_df.to_csv(new_dir + '/clock_info.csv', index=False)
 
-    save_metadata(new_dir)
+    save_metadata(new_dir, algorithm)
     print('Simulation data successfully saved.')
 
 if __name__ == '__main__':
