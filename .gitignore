@@ -2,6 +2,7 @@
 data/*
 runs/*
 server/*
+notebooks/*
 *.pyc
 *.DS_Store
 .VSCodeCounter/*
