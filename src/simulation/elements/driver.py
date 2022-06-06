@@ -58,6 +58,7 @@ class Driver(object):
         self.will_head_home = False
         
         # Patience (NONE for infinity)
+        self.start_time = None
         self.patience = None
 
         # Last known location
@@ -137,10 +138,16 @@ class Driver(object):
             if self.num_jobs == 0:
                 try:
                     yield self.env.process(self.wait_for_request())
+            
                 except simpy.Interrupt:
                     if self.verbose:
                         print(f'{cdate(self.env.now)}: Driver {self.num:5.0f} got request, waited for {self.oos_wait:2.2f} @ TAZ {self.curr_pos}')
-            
+
+                # Calculate the time spent waiting
+                wait_time = self.env.now - self.start_time
+                self.oos_wait += wait_time
+
+
             # Get job
             self.curr_job = self.jobs.pop(0)
             
@@ -235,16 +242,11 @@ class Driver(object):
         Wait until a new request is received.
         """
         # Wait until needed
-        start_time = self.env.now
+        self.start_time = self.env.now
         if self.patience is None:
             yield self.env.timeout(simpy.core.Infinity)
         else:
             yield self.env.timeout(self.patience)
-
-        # Calculate the time spent waiting
-        end_time = self.env.now
-        wait_time = end_time - start_time
-        self.oos_wait += wait_time
 
         # Go offline if wait was too long
         #if wait_time == self.patience:

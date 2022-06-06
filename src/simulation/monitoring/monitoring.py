@@ -201,10 +201,10 @@ def extract_driver_information(driver_collection: List) -> pd.DataFrame:
         oos_total = driver.oos_total
         service_drive = driver.trip_total
         total_time_active = driver.total_time_active
-        num_jobs = driver.num_jobs
-        drivers.append([oos_wait, oos_drive, oos_total, service_drive, total_time_active, num_jobs])
+        num_trips = driver.num_trips
+        drivers.append([oos_wait, oos_drive, oos_total, service_drive, total_time_active, num_trips])
     
-    col_info = ['oos_wait', 'oos_drive', 'oos_total', 'service_drive', 'total_time_active', 'num_jobs']
+    col_info = ['oos_wait', 'oos_drive', 'oos_total', 'service_drive', 'total_time_active', 'num_trips']
     driver_df = pd.DataFrame(drivers, columns=col_info)
     return driver_df
 
